@@ -6,12 +6,28 @@ Made for Dune: Awakening. Originally forked from https://github.com/theyetty and
 
 Removed from fork network due to original author repository being deleted, and database/backend changes incompatible with other forks.
 
-## What's New 11 AUG 2025
-- **Dual-inventory tracking** - Track inventory of a Hagga guild base as well as a Deep Desert base
-- **Transfer between inventory** - Modal to transfer inventory amounts between DD and Hagga
-- **Metadata bulk update fix** - Fixed Error 400 when attempting to edit resource metadata
-- **Updated "populate-resources-safe" script** - Adds more game resources; deleted example resources.
-- **Updated vulnerable dependencies**
+## 🚀 Release Notes - Version 3.2.4
+
+**Release Date:** August 27, 2025
+
+---
+
+### Key Features
+* **Improved Target Quantity Editing:** The inline text input for a resource's target quantity has been replaced with a new modal. The **ResourceTable** component now shows the target as plain text, and a new **'Set Target'** button has been added to both the grid and table views. Clicking this button opens a new **ChangeTargetModal** to set the quantity.
+* **User Data Export:** Users with **hasUserManagementAccess** can now export data for any user. A new API route, `app/api/users/[userId]/data-export/route.ts`, handles the export, and the **UserTable** component now includes an **'Export Data'** button for authorized users.
+
+### Improvements & Fixes
+* The button for setting quantity has been relabeled from "Set" to **"Set Qty"**.
+* The new **"Set Target"** button is styled with an orange color for better visibility.
+* The table view's layout has been adjusted: the **"Resource"** column is narrower with text wrapping, and the **"Actions"** column is wider.
+* The table layout is now set to `table-fixed` to ensure consistent column widths.
+* Action buttons in the table view now have a minimum width of `20` units (`min-w-20`).
+* Dependency versions were updated: `@libsql/client` from 0.15.12 to 0.15.14, `@types/node` from 22.17.2 to 22.18.0, and `drizzle-orm` from 0.44.4 to 0.44.5.
+* Fixed a bug where `useEffect` in React was missing dependencies.
+ 
+*See lib/changelog.json for previous update history*
+
+----------------------------------------------------------------------------------------
 
 ## Features
 
@@ -94,6 +110,8 @@ NEXT_PUBLIC_ORG_NAME=Your Community Name
 ```
 
 4. Click **Deploy**
+
+***Vercel Project Settings Note: Under "Settings" -> "Build and Deployment", make sure "Node.js Version" is set to "22.x". Redeploy the production build if necessary.***
 
 ### Step 6: Initialize Database Schema
 After deployment, you need to set up your database tables:

@@ -7,6 +7,7 @@ import { CongratulationsPopup } from './CongratulationsPopup'
 import { TransferModal } from './TransferModal'
 import { UpdateQuantityModal } from './UpdateQuantityModal'
 import { EditResourceModal } from './EditResourceModal'
+import { ChangeTargetModal } from './ChangeTargetModal'
 import { getUserIdentifier } from '@/lib/auth'
 import {
   CATEGORY_OPTIONS,
@@ -18,6 +19,7 @@ import {
   MS_IN_MINUTE,
   ONE_WEEK_IN_MS,
   RAW_CATEGORY,
+  BP_CATEGORY,
   RESOURCES_API_PATH,
   RESOURCE_STATUS,
   RESOURCE_STATUS_THRESHOLDS,
@@ -221,9 +223,6 @@ export function ResourceTable({ userId }: ResourceTableProps) {
     session?.user?.permissions?.hasResourceAdminAccess ?? false
 
   const [resources, setResources] = useState<Resource[]>([])
-  const [editedTargets, setEditedTargets] = useState<Map<string, number>>(
-    new Map(),
-  )
   const [
     statusChanges,
     setStatusChanges,
@@ -272,6 +271,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
     LEADERBOARD_TIME_FILTERS.ALL,
   )
   const [needsUpdateFilter, setNeedsUpdateFilter] = useState(false)
+  const [categoryFilter, setCategoryFilter] = useState('all')
 
   // Add state for update modal
   const [updateModalState, setUpdateModalState] = useState<{
@@ -282,6 +282,11 @@ export function ResourceTable({ userId }: ResourceTableProps) {
 
   // Admin state for resource editing
   const [editModalState, setEditModalState] = useState<{
+    isOpen: boolean
+    resource: Resource | null
+  }>({ isOpen: false, resource: null })
+
+  const [changeTargetModalState, setChangeTargetModalState] = useState<{
     isOpen: boolean
     resource: Resource | null
   }>({ isOpen: false, resource: null })
@@ -356,6 +361,28 @@ export function ResourceTable({ userId }: ResourceTableProps) {
   // Update status options with counts
   statusOptions.forEach((option) => {
     option.count = statusCounts[option.value] || 0
+  })
+
+  // Create category options for filter dropdown
+  const categoryOptions = [
+    { value: 'all', label: 'All Categories', count: 0 },
+    ...CATEGORY_OPTIONS.map((cat) => ({ value: cat, label: cat, count: 0 })),
+  ]
+
+  // Calculate category counts
+  const categoryCounts = resources.reduce(
+    (acc, resource) => {
+      const category = resource.category || UNCATEGORIZED
+      acc[category] = (acc[category] || 0) + 1
+      acc.all = (acc.all || 0) + 1
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  // Update category options with counts
+  categoryOptions.forEach((option) => {
+    option.count = categoryCounts[option.value] || 0
   })
 
   // Calculate needs updating count
@@ -491,36 +518,11 @@ export function ResourceTable({ userId }: ResourceTableProps) {
     }
   }, [])
 
-  // Handle target quantity change (admin only)
-  const handleTargetQuantityChange = (
+  const handleSaveTargetChange = async (
     resourceId: string,
     newTarget: number,
   ) => {
     if (!isTargetAdmin) return
-
-    const resource = resources.find((r) => r.id === resourceId)
-    if (!resource) return
-
-    setEditedTargets((prev) => new Map(prev).set(resourceId, newTarget))
-    setResources((prev) =>
-      prev.map((r) =>
-        r.id === resourceId ? { ...r, targetQuantity: newTarget } : r,
-      ),
-    )
-
-    // Update status immediately based on current quantity and new target
-    updateResourceStatus(
-      resourceId,
-      resource.quantityHagga + resource.quantityDeepDesert,
-      newTarget,
-    )
-  }
-
-  const saveTargetQuantity = async (resourceId: string) => {
-    if (!isTargetAdmin) return
-
-    const newTarget = editedTargets.get(resourceId)
-    if (newTarget === undefined) return
 
     setSaving(true)
     try {
@@ -540,23 +542,20 @@ export function ResourceTable({ userId }: ResourceTableProps) {
       )
 
       if (response.ok) {
-        setEditedTargets((prev) => {
-          const newMap = new Map(prev)
-          newMap.delete(resourceId)
-          return newMap
-        })
-
-        // Clear status change indicator since the save was successful
-        setStatusChanges((prev) => {
-          const newMap = new Map(prev)
-          newMap.delete(resourceId)
-          return newMap
-        })
+        const updatedResource = await response.json()
+        setResources((prev) =>
+          prev.map((r) =>
+            r.id === resourceId ? { ...r, ...updatedResource } : r,
+          ),
+        )
+        setChangeTargetModalState({ isOpen: false, resource: null })
       } else {
         console.error('Failed to save target quantity')
+        throw new Error('Failed to save target quantity.')
       }
     } catch (error) {
       console.error('Error saving target quantity:', error)
+      throw error
     } finally {
       setSaving(false)
     }
@@ -855,7 +854,18 @@ export function ResourceTable({ userId }: ResourceTableProps) {
         matchesNeedsUpdate = needsUpdating(resource.updatedAt)
       }
 
-      return matchesSearch && matchesStatus && matchesNeedsUpdate
+      // Category filter
+      let matchesCategory = true
+      if (categoryFilter !== 'all') {
+        matchesCategory = (resource.category || UNCATEGORIZED) === categoryFilter
+      }
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesNeedsUpdate &&
+        matchesCategory
+      )
     })
     .sort((a, b) => {
       // If there's a search term, sort by search relevance
@@ -1463,6 +1473,24 @@ export function ResourceTable({ userId }: ResourceTableProps) {
               </select>
             </div>
 
+            {/* Category Filter */}
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                Category:
+              </label>
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                {categoryOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label} ({option.count})
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Needs Updating Filter */}
             <div className="flex items-center gap-2">
               <label className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
@@ -1480,7 +1508,10 @@ export function ResourceTable({ userId }: ResourceTableProps) {
             </div>
 
             {/* Active Filters Indicator */}
-            {(statusFilter !== 'all' || needsUpdateFilter || searchTerm) && (
+            {(statusFilter !== 'all' ||
+              needsUpdateFilter ||
+              searchTerm ||
+              categoryFilter !== 'all') && (
               <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
                 <span>
                   Showing {filteredResources.length} of {resources.length}{' '}
@@ -1491,6 +1522,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                     setStatusFilter('all')
                     setNeedsUpdateFilter(false)
                     setSearchTerm('')
+                    setCategoryFilter('all')
                   }}
                   className="text-blue-600 dark:text-blue-400 hover:underline"
                 >
@@ -1544,10 +1576,16 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                     return (
                       <div
                         key={resource.id}
-                        className={`bg-white dark:bg-gray-800 border rounded-lg p-4 hover:shadow-md transition-all cursor-pointer group ${
+                        className={`border rounded-lg p-4 hover:shadow-md transition-all cursor-pointer group ${
                           isStale
-                            ? 'border-amber-300 dark:border-amber-600 ring-1 ring-amber-200 dark:ring-amber-800 bg-amber-50/50 dark:bg-amber-900/10'
+                            ? 'border-amber-300 dark:border-amber-600 ring-1 ring-amber-200 dark:ring-amber-800'
                             : 'border-gray-200 dark:border-gray-700'
+                        } ${
+                          resource.category === BP_CATEGORY
+                            ? 'bg-purple-200 dark:bg-violet-900/30 hover:bg-purple-300 dark:hover:bg-violet-900/50'
+                            : isStale
+                            ? 'bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20'
+                            : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                         onClick={() => handleResourceClick(resource.id)}
                         title={
@@ -1723,7 +1761,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                                   }}
                                   className="flex-1 bg-purple-100 dark:bg-purple-900/50 hover:bg-purple-200 dark:hover:bg-purple-900/70 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
                                 >
-                                  Set
+                                  Set Qty
                                 </button>
                               </div>
                               <div className="flex gap-1">
@@ -1739,6 +1777,20 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                                 >
                                   Transfer
                                 </button>
+                                {isTargetAdmin && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setChangeTargetModalState({
+                                        isOpen: true,
+                                        resource: resource,
+                                      })
+                                    }}
+                                    className="flex-1 bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-200 dark:hover:bg-orange-900/70 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
+                                  >
+                                    Set Target
+                                  </button>
+                                )}
                               </div>
 
                               {/* Admin buttons */}
@@ -1784,10 +1836,10 @@ export function ResourceTable({ userId }: ResourceTableProps) {
       {viewMode === VIEW_MODE.TABLE && (
         <div className="bg-white dark:bg-gray-800 shadow-xs rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
               <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-1/4">
                     Resource
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
@@ -1807,7 +1859,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                       Target
                     </th>
                   )}
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">
                     Actions
                   </th>
                 </tr>
@@ -1819,8 +1871,6 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                     resource.targetQuantity || 0,
                   )
                   const statusChange = statusChanges.get(resource.id)
-                  const pendingTarget = editedTargets.get(resource.id)
-                  const isEdited = pendingTarget !== undefined
                   const isStale = isResourceStale(resource.updatedAt)
 
                   return (
@@ -1828,7 +1878,13 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                       key={resource.id}
                       className={`cursor-pointer transition-colors group ${
                         isStale
-                          ? 'bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20 border-l-4 border-l-amber-400 dark:border-l-amber-500'
+                          ? 'border-l-4 border-l-amber-400 dark:border-l-amber-500'
+                          : ''
+                      } ${
+                        resource.category === BP_CATEGORY
+                          ? 'bg-purple-200 dark:bg-violet-900/30 hover:bg-purple-300 dark:hover:bg-violet-900/50'
+                          : isStale
+                          ? 'bg-amber-50/50 dark:bg-amber-900/10 hover:bg-amber-100/50 dark:hover:bg-amber-900/20'
                           : 'hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                       onClick={() => handleResourceClick(resource.id)}
@@ -1838,7 +1894,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                           : 'Click to view detailed resource information'
                       }
                     >
-                      <td className="px-3 py-3 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         <div className="flex items-center">
                           <div className="shrink-0 h-12 w-12">
                             {resource.imageUrl ? (
@@ -1866,7 +1922,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                             </div>
                           </div>
                           <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors break-words">
                               {resource.name}
                               <svg
                                 className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity"
@@ -1925,41 +1981,15 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                         {formatNumber(resource.quantityDeepDesert)}
                       </td>
                       {isTargetAdmin && (
-                        <td
-                          className="px-3 py-3 whitespace-nowrap"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={
-                                pendingTarget ?? resource.targetQuantity ?? ''
-                              }
-                              onChange={(e) =>
-                                handleTargetQuantityChange(
-                                  resource.id,
-                                  parseInt(e.target.value) || 0,
-                                )
-                              }
-                              className="w-20 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
-                              placeholder="Target"
-                            />
-                            {isEdited && (
-                              <button
-                                onClick={() => saveTargetQuantity(resource.id)}
-                                disabled={saving}
-                                className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 disabled:opacity-50 text-white px-2 py-1 rounded-sm text-xs transition-colors"
-                              >
-                                Save
-                              </button>
-                            )}
-                          </div>
+                        <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                          {resource.targetQuantity
+                            ? formatNumber(resource.targetQuantity)
+                            : 'No target set'}
                         </td>
                       )}
 
                       <td
-                        className="px-3 py-3 whitespace-nowrap text-sm"
+                        className="px-3 py-3 text-sm"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="space-y-2">
@@ -1974,7 +2004,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                                     updateType: UPDATE_TYPE.RELATIVE,
                                   })
                                 }
-                                className="flex-1 bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-900/70 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
+                                className="flex-1 min-w-20 bg-blue-100 dark:bg-blue-900/50 hover:bg-blue-200 dark:hover:bg-blue-900/70 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
                               >
                                 Add/Remove
                               </button>
@@ -1986,10 +2016,36 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                                     updateType: UPDATE_TYPE.ABSOLUTE,
                                   })
                                 }
-                                className="flex-1 bg-purple-100 dark:bg-purple-900/50 hover:bg-purple-200 dark:hover:bg-purple-900/70 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
+                                className="flex-1 min-w-20 bg-purple-100 dark:bg-purple-900/50 hover:bg-purple-200 dark:hover:bg-purple-900/70 text-purple-700 dark:text-purple-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
                               >
-                                Set
+                                  Set Qty
                               </button>
+                            </div>
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() =>
+                                  setTransferModalState({
+                                    isOpen: true,
+                                    resource: resource,
+                                  })
+                                }
+                                className="flex-1 min-w-20 bg-green-100 dark:bg-green-900/50 hover:bg-green-200 dark:hover:bg-green-900/70 text-green-700 dark:text-green-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
+                              >
+                                Transfer
+                              </button>
+                              {isTargetAdmin && (
+                                <button
+                                  onClick={() =>
+                                    setChangeTargetModalState({
+                                      isOpen: true,
+                                      resource: resource,
+                                    })
+                                  }
+                                  className="flex-1 min-w-20 bg-orange-100 dark:bg-orange-900/50 hover:bg-orange-200 dark:hover:bg-orange-900/70 text-orange-700 dark:text-orange-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
+                                >
+                                  Set Target
+                                </button>
+                              )}
                             </div>
 
                             {/* Admin buttons */}
@@ -1997,7 +2053,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                               <div className="flex gap-1">
                                 <button
                                   onClick={() => startEditResource(resource)}
-                                  className="flex-1 bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-200 dark:hover:bg-yellow-900/70 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
+                                  className="flex-1 min-w-20 bg-yellow-100 dark:bg-yellow-900/50 hover:bg-yellow-200 dark:hover:bg-yellow-900/70 text-yellow-700 dark:text-yellow-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
                                 >
                                   Edit
                                 </button>
@@ -2009,7 +2065,7 @@ export function ResourceTable({ userId }: ResourceTableProps) {
                                       showDialog: true,
                                     })
                                   }
-                                  className="flex-1 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/70 text-red-700 dark:text-red-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
+                                  className="flex-1 min-w-20 bg-red-100 dark:bg-red-900/50 hover:bg-red-200 dark:hover:bg-red-900/70 text-red-700 dark:text-red-300 px-2 py-1 rounded-sm text-xs font-medium transition-colors"
                                 >
                                   Delete
                                 </button>
@@ -2169,6 +2225,16 @@ export function ResourceTable({ userId }: ResourceTableProps) {
         onSave={saveResourceMetadata}
         resource={editModalState.resource}
       />
+      {changeTargetModalState.isOpen && changeTargetModalState.resource && (
+        <ChangeTargetModal
+          isOpen={changeTargetModalState.isOpen}
+          onClose={() =>
+            setChangeTargetModalState({ isOpen: false, resource: null })
+          }
+          onSave={handleSaveTargetChange}
+          resource={changeTargetModalState.resource}
+        />
+      )}
       <CongratulationsPopup
         isVisible={congratulationsState.isVisible}
         pointsEarned={congratulationsState.pointsEarned}

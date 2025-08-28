@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ResourceHistoryChart } from '@/app/components/ResourceHistoryChart'
 import { CongratulationsPopup } from '@/app/components/CongratulationsPopup'
+import LinkifiedText from '@/app/components/LinkifiedText'
 import { getUserIdentifier } from '@/lib/auth'
 
 // Utility function to format numbers with commas
@@ -117,7 +118,7 @@ export default function ResourceDetailPage() {
   const canDeleteHistory = session?.user?.permissions?.hasResourceAdminAccess ?? false
 
   // Fetch history data
-  const fetchHistory = async (days: number) => {
+  const fetchHistory = useCallback(async (days: number) => {
     setHistoryLoading(true)
     try {
       const response = await fetch(`/api/resources/${resourceId}/history?days=${days}`, {
@@ -135,10 +136,10 @@ export default function ResourceDetailPage() {
     } finally {
       setHistoryLoading(false)
     }
-  }
+  }, [resourceId])
 
   // Fetch leaderboard data
-  const fetchLeaderboard = async () => {
+  const fetchLeaderboard = useCallback(async () => {
     setLeaderboardLoading(true)
     try {
       const response = await fetch('/api/leaderboard?timeFilter=7d&limit=10', {
@@ -155,7 +156,7 @@ export default function ResourceDetailPage() {
     } finally {
       setLeaderboardLoading(false)
     }
-  }
+  }, [])
 
   // Calculate leaderboard from history (legacy - keeping for fallback)
   const calculateLeaderboard = () => {
@@ -395,11 +396,17 @@ export default function ResourceDetailPage() {
 
   // Fetch history when component mounts or time filter changes
   useEffect(() => {
-    if (resourceId && sessionStatus === 'authenticated') {
-      fetchHistory(timeFilter)
-      fetchLeaderboard()
-    }
-  }, [resourceId, timeFilter, sessionStatus])
+  if (resourceId && sessionStatus === 'authenticated') {
+    fetchHistory(timeFilter)
+  }
+}, [resourceId, timeFilter, sessionStatus, fetchHistory])
+
+// Fetch leaderboard data when component mounts
+useEffect(() => {
+  if (resourceId && sessionStatus === 'authenticated') {
+    fetchLeaderboard()
+  }
+}, [resourceId, sessionStatus, fetchLeaderboard])
 
   // Scroll selected entry into view
   useEffect(() => {
@@ -554,7 +561,7 @@ export default function ResourceDetailPage() {
                       {/* Description */}
                       {resource.description && (
                         <p className="text-gray-600 dark:text-gray-400 text-center md:text-left">
-                          {resource.description}
+                          <LinkifiedText text={resource.description} />
                         </p>
                       )}
                     </div>
