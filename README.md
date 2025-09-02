@@ -1,3 +1,5 @@
+# 🚨⚠️Users Moving from the old tracker, and those updating from 3.x to 4.x - please refer to the [Database Migration Guide](./DB_MIGRATION.md).⚠️🚨
+
 # Resource Tracker
 
 A comprehensive resource management and tracking portal with Discord authentication and role-based access control. Perfect for gaming communities, organizations, and teams that need to track shared resources, inventory, or assets.
@@ -6,40 +8,23 @@ Made for Dune: Awakening. Originally forked from https://github.com/theyetty and
 
 Removed from fork network due to original author repository being deleted, and database/backend changes incompatible with other forks.
 
-## 🚀 Release Notes - Version 3.2.5
+## 🚀 Release Notes - Version 4.0.0
 
-**Release Date:** August 28, 2025
-
----
-
-### New Features
-* **Improved Activity Chart:** The activity timeline chart on the resource detail page now shows three distinct lines—one for Deep Desert, one for Hagga, and a total quantity line—each with a unique color. The chart's scaling and y-axis labels have been optimized to better display all three data sets. A legend has also been added to help identify each line.
-
-### Bug Fixes
-* **Target Column Visibility:** Fixed a bug where the "Target" column was not showing for users who do not have permissions to edit targets.
-
-## 🚀 Release Notes - Version 3.2.4
-
-**Release Date:** August 27, 2025
+**Release Date:** September 2, 2025
 
 ---
 
-### Key Features
-* **Improved Target Quantity Editing:** The inline text input for a resource's target quantity has been replaced with a new modal. The **ResourceTable** component now shows the target as plain text, and a new **'Set Target'** button has been added to both the grid and table views. Clicking this button opens a new **ChangeTargetModal** to set the quantity.
-* **User Data Export:** Users with **hasUserManagementAccess** can now export data for any user. A new API route, `app/api/users/[userId]/data-export/route.ts`, handles the export, and the **UserTable** component now includes an **'Export Data'** button for authorized users.
+### ✨ New Feature
 
-### Improvements & Fixes
-* The button for setting quantity has been relabeled from "Set" to **"Set Qty"**.
-* The new **"Set Target"** button is styled with an orange color for better visibility.
-* The table view's layout has been adjusted: the **"Resource"** column is narrower with text wrapping, and the **"Actions"** column is wider.
-* The table layout is now set to `table-fixed` to ensure consistent column widths.
-* Action buttons in the table view now have a minimum width of `20` units (`min-w-20`).
-* Dependency versions were updated: `@libsql/client` from 0.15.12 to 0.15.14, `@types/node` from 22.17.2 to 22.18.0, and `drizzle-orm` from 0.44.4 to 0.44.5.
-* Fixed a bug where `useEffect` in React was missing dependencies.
- 
+* **Priority Resource Flag:** Resources now have an `isPriority` boolean flag. This update includes adding a new column to the database, a checkbox in the **EditResourceModal** to set the status, and a visual indicator (an asterisk) in both the table and grid views. Additionally, a filter has been implemented to display only priority resources, and the API has been updated to support this new feature.
+
+
 *See lib/changelog.json for previous update history*
 
 ----------------------------------------------------------------------------------------
+
+![Resource Page Example](ResourcesPageSample.png)
+
 
 ## Features
 
@@ -148,7 +133,7 @@ TURSO_AUTH_TOKEN=your_turso_auth_token
 
 4. Run the database migration:
 ```bash
-npm run db:push
+npx drizzle-kit push
 ```
 
 ### Step 7: Populate with Sample Data (Optional)
@@ -183,9 +168,9 @@ npm install
 
 2. Create a `.env.local` file with the environment variables (see [ENVIRONMENT.md](./ENVIRONMENT.md) for details)
 
-3. Run database migrations:
+3. Run the database migration:
 ```bash
-npm run db:push
+npx drizzle-kit push
 ```
 
 4. Start the development server:
