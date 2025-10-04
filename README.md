@@ -8,15 +8,25 @@ Made for Dune: Awakening. Originally forked from https://github.com/theyetty and
 
 Removed from fork network due to original author repository being deleted, and database/backend changes incompatible with other forks.
 
-## 🚀 Release Notes - Version 4.0.3
+## 🚀 Release Notes - Version 4.0.6
 
-**Release Date:** 2025-09-22
+**Release Date:** October 2, 2025
 
 ---
 
 ### ✨ New Features
 
-* Added the ability to submit the edit, set quantity, set target, and transfer modals by pressing the Enter key in the text input fields.
+* **Admin Resource Update Override:** Administrators can now update resource quantities on behalf of other users via a new dropdown in the **"Add/Remove" modal**. The backend API has been updated to accept an `onBehalfOf` parameter, and an audit note is automatically recorded in the reason field for these actions.
+
+### 🚀 Improvements
+
+* **Core Framework Upgrades:** The application has been upgraded to **React 19.2.0** and **Next.js 15.1.1**, bringing the project up to date with the latest versions of these critical frameworks.
+* **API Route Handler Adaptations:** Dynamic API route handlers were updated to correctly process **asynchronous parameters**, a new requirement in Next.js 15.
+* **Type Definition Streamlining:** The `@types/react` and `@types/react-dom` packages were removed, as **React 19 now includes its own type definitions**, simplifying project dependency management.
+
+### 🐛 Bug Fixes
+
+* **Congratulations Popup Fix:** Fixed a bug where the **congratulations popup** was not appearing after a resource update. The logic in `ResourceTable.tsx` now correctly uses the `pointsEarned` from the API response to trigger the popup.
 
 *See lib/changelog.json for previous update history*
 
@@ -136,7 +146,8 @@ TURSO_AUTH_TOKEN=your_turso_auth_token
 
 4. Run the database migration:
 ```bash
-npx drizzle-kit push
+npm run db:push
+npm run db:log-init
 ```
 
 ### Step 7: Populate with Sample Data (Optional)
@@ -164,6 +175,9 @@ Your Resource Tracker is now running for free! Visit your Vercel URL and sign in
 
 For local development:
 
+### Requires:
+- NodeJS 22.x LTS (includes npm) (https://nodejs.org/)
+
 1. Install dependencies:
 ```bash
 npm install
@@ -173,7 +187,8 @@ npm install
 
 3. Run the database migration:
 ```bash
-npx drizzle-kit push
+npm run db:push
+npm run db:log-init
 ```
 
 4. Start the development server:

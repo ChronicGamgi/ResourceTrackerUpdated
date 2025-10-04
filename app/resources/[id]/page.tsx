@@ -296,7 +296,8 @@ export default function ResourceDetailPage() {
         setNewQuantity(0)
         setNewQuantityInput('')
         // Refresh history and leaderboard to show the new change
-        handleResourceUpdate()
+        fetchHistory(timeFilter)
+        fetchLeaderboard()
       } else {
         const errorData = await response.text()
         console.error('Failed to update resource:', errorData)
@@ -310,45 +311,13 @@ export default function ResourceDetailPage() {
     }
   }
 
-  const handleResourceUpdate = () => {
-    fetchHistory(timeFilter)
-    fetchLeaderboard()
-    // A simple way to refetch the resource is to just reload the main resource data
-    // This is less efficient than updating state directly, but safer
-    // and for a single resource page, performance impact is minimal.
-    const fetchResource = async () => {
-      try {
-        const response = await fetch(`/api/resources`, {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
-        })
-        if (response.ok) {
-          const resources = await response.json()
-          const foundResource = resources.find((r: Resource) => r.id === resourceId)
-          if (foundResource) {
-            setResource({
-              ...foundResource,
-              updatedAt: typeof foundResource.updatedAt === 'string'
-                ? foundResource.updatedAt
-                : new Date(foundResource.updatedAt).toISOString(),
-              createdAt: typeof foundResource.createdAt === 'string'
-                ? foundResource.createdAt
-                : new Date(foundResource.createdAt).toISOString(),
-            })
-          }
-        }
-      } catch (error) {
-        console.error('Error refetching resource:', error)
-      }
-    }
-    fetchResource()
-  }
-
   const handleUpdate = async (
     resourceId: string,
     amount: number,
     quantityField: 'quantityHagga' | 'quantityDeepDesert',
     updateType: 'absolute' | 'relative',
+    reason?: string,
+    onBehalfOf?: string,
   ) => {
     if (!resource) return
 
@@ -372,11 +341,35 @@ export default function ResourceDetailPage() {
           updateType: updateType,
           changeValue: amount,
           quantityField: quantityField,
+          reason,
+          onBehalfOf,
         }),
       })
 
       if (response.ok) {
-        handleResourceUpdate()
+        const { resource: updatedResource, pointsEarned, pointsCalculation } = await response.json()
+        setResource(updatedResource)
+
+        // Show congratulations popup if points were earned
+        if (pointsEarned > 0) {
+          setCongratulationsState({
+            isVisible: true,
+            finalPoints: pointsEarned,
+            pointsCalculation: pointsCalculation,
+            resourceName: updatedResource.name,
+            actionType:
+              updateType === 'absolute'
+                ? 'SET'
+                : amount > 0
+                  ? 'ADD'
+                  : 'REMOVE',
+            quantityChanged: Math.abs(amount),
+          })
+        }
+
+        // Manually trigger a history and leaderboard refresh
+        fetchHistory(timeFilter)
+        fetchLeaderboard()
       } else {
         const { error } = await response.json()
         throw new Error(error || 'Failed to update quantity.')
@@ -411,7 +404,8 @@ export default function ResourceDetailPage() {
       )
 
       if (response.ok) {
-        handleResourceUpdate()
+        const updatedResource = await response.json()
+        setResource(updatedResource)
         setChangeTargetModalState({ isOpen: false, resource: null })
       } else {
         console.error('Failed to save target quantity')
@@ -448,7 +442,10 @@ export default function ResourceDetailPage() {
       )
 
       if (response.ok) {
-        handleResourceUpdate()
+        const { resource: updatedResource } = await response.json()
+        setResource(updatedResource)
+        fetchHistory(timeFilter)
+        fetchLeaderboard()
       } else {
         const { error } = await response.json()
         throw new Error(error || 'Failed to transfer quantity.')
@@ -1398,24 +1395,24 @@ export default function ResourceDetailPage() {
                     <div
                       key={entry.id}
                       id={`history-entry-${entry.id}`}
-                      className={`group flex items-center justify-between p-4 rounded-lg transition-all duration-300 cursor-pointer ${isHighlighted
+                      className={`group flex items-start justify-between p-4 rounded-lg transition-all duration-300 cursor-pointer ${isHighlighted
                         ? 'bg-blue-100 dark:bg-blue-900/50 border-2 border-blue-300 dark:border-blue-500 shadow-md transform scale-[1.02]'
                         : 'bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600'
                         }`}
                       onClick={() => setSelectedPointId(selectedPointId === entry.id ? null : entry.id)}
                     >
-                      <div className="flex items-center gap-4">
-                        <div className={`w-3 h-3 rounded-full ${entry.changeAmountHagga + entry.changeAmountDeepDesert > 0 ? 'bg-green-500' :
+                      <div className="flex items-start gap-4 flex-1 min-w-0">
+                        <div className={`mt-1.5 w-3 h-3 rounded-full flex-shrink-0 ${entry.changeAmountHagga + entry.changeAmountDeepDesert > 0 ? 'bg-green-500' :
                           entry.changeAmountHagga + entry.changeAmountDeepDesert < 0 ? 'bg-red-500' : 'bg-gray-400'
                           } ${isHighlighted ? 'ring-2 ring-blue-400 dark:ring-blue-500' : ''}`}></div>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-gray-900 dark:text-gray-100 flex items-center flex-wrap gap-2">
                             {entry.changeType === 'transfer' ? (
                               <span>
                                 Transfer {entry.transferAmount} {entry.transferDirection === 'to_deep_desert' ? 'to Deep Desert' : 'to Hagga'}
                               </span>
                             ) : (
-                              <div>
+                              <div className="flex flex-col">
                                 <div>
                                   Hagga: {formatNumber(entry.previousQuantityHagga)} → {formatNumber(entry.newQuantityHagga)} ({entry.changeAmountHagga > 0 ? '+' : ''}{formatNumber(entry.changeAmountHagga)})
                                 </div>
@@ -1439,19 +1436,21 @@ export default function ResourceDetailPage() {
                               </span>
                             )}
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
+                          <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                             By <span className="font-medium">{entry.updatedBy}</span>
-                            {entry.reason && (
-                              <span className="ml-2 text-blue-600 dark:text-blue-400">• {entry.reason}</span>
-                            )}
                             {entry.changeType === 'relative' && (
                               <span className="ml-2 text-green-600 dark:text-green-400 text-xs">• Counts toward leaderboard</span>
                             )}
                           </div>
+                          {entry.reason && (
+                            <div className="mt-2 text-sm text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-gray-900/40 p-2 rounded-md whitespace-pre-wrap break-words">
+                              <LinkifiedText text={entry.reason} />
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-sm text-gray-500 dark:text-gray-400 text-right">
+                      <div className="flex items-start gap-3 pl-4">
+                        <div className="text-sm text-gray-500 dark:text-gray-400 text-right flex-shrink-0">
                           <div
                             className="cursor-help hover:underline decoration-dotted"
                             title={`${new Date(entry.createdAt).toLocaleDateString()} at ${new Date(entry.createdAt).toLocaleTimeString()}`}
@@ -1511,6 +1510,7 @@ export default function ResourceDetailPage() {
           updateType={updateModalState.updateType}
           onClose={() => setUpdateModalState({ isOpen: false, resource: null, updateType: 'absolute' })}
           onUpdate={handleUpdate}
+          session={session}
         />
       )}
 

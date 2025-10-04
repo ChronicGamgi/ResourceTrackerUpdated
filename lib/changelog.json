@@ -1,6 +1,50 @@
 {
-   "currentVersion": "4.0.3",
+  "currentVersion": "4.0.6",
   "releases": [
+    {
+      "version": "4.0.6",
+      "date": "2025-10-02",
+      "title": "Admin Override, Framework Upgrades, and Fixes",
+      "type": "minor",
+      "changes": [
+        {
+          "type": "feature",
+          "description": "Administrators can now update resource quantities on behalf of other users via a new dropdown in the 'Add/Remove' modal. The backend API (`PUT /api/resources/[id]`) was updated to accept an `onBehalfOf` parameter, and an audit note is automatically appended to the reason when this feature is used."
+        },
+        {
+          "type": "improvement",
+          "description": "The application core frameworks have been upgraded to React 19.2.0 and Next.js 15.1.1. This includes updating dynamic API route handlers to correctly process asynchronous parameters and removing the now-redundant `@types/react` and `@types/react-dom` packages."
+        },
+        {
+          "type": "bugfix",
+          "description": "Fixed a bug where the congratulations popup was not appearing after a resource update. The `handleUpdate` function in `ResourceTable.tsx` now correctly uses the `pointsEarned` from the API response to trigger the popup."
+        }
+      ]
+    },
+    {
+      "version": "4.0.5",
+      "date": "2025-09-29",
+      "title": "Notes Feature, Modal Sizing, and Backdrop Fix",
+      "type": "minor",
+      "changes": [
+        {
+          "type": "feature",
+          "description": "An optional 'Notes' textarea has been added to the 'Add/Remove' and 'Set Qty' modals, allowing users to provide a reason (up to 250 characters) for quantity changes. This input is saved to the `reason` column in the `resource_history` table, and the resource history display has been updated to ensure the text wraps and is fully visible."
+        },
+        {
+          "type": "improvement",
+          "description": "The width of `UpdateQuantityModal`, `ChangeTargetModal`, `TransferModal`, `EditResourceModal`, and `CongratulationsPopup` has been increased on desktop and larger screens to improve usability."
+        },
+        {
+          "type": "bugfix",
+          "description": "Fixed an issue where a modal could unintentionally close if a user clicked down on the modal content and released the click on the backdrop. This was resolved by replacing the `onClick` handler on modal backdrops with `onMouseDown`."
+        },
+        {
+          "type": "other",
+          "description": "Bumped drizzle-kit from 0.31.4 to 0.31.5."
+        }
+      ]
+    },
     {
       "version": "4.0.3",
       "date": "2025-09-22",
