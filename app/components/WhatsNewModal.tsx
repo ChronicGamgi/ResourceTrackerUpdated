@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useSession } from 'next-auth/react'
+import { Github, Bug } from 'lucide-react'
 import { 
   getCurrentVersion, 
   getReleasesSince, 
@@ -131,14 +132,36 @@ export function WhatsNewModal({ isOpen: externalIsOpen, onClose: externalOnClose
               <h2 id="whats-new-modal-title" className="text-2xl font-bold">What&apos;s New</h2>
               <p className="text-blue-100 mt-1">Latest updates and improvements</p>
             </div>
-            <button
-              onClick={() => handleClose(true)}
-              className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-600 transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              <a
+                href="https://github.com/sininspira2/ResourceTracker/issues/new"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-600 transition-colors"
+                aria-label="Report a Bug"
+                title="Report a Bug"
+              >
+                <Bug className="w-6 h-6" />
+              </a>
+              <a
+                href="https://github.com/sininspira2/ResourceTracker"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-600 transition-colors"
+                aria-label="Visit project Github"
+                title="Visit project Github"
+              >
+                <Github className="w-6 h-6" />
+              </a>
+              <button
+                onClick={() => handleClose(true)}
+                className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-600 transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
 
