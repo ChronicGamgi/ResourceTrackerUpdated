@@ -66,8 +66,8 @@ export function ChangeTargetModal({
 
   return (
     <div
-      className={`fixed inset-0 flex items-center justify-center z-50 transition-colors duration-300 ease-in-out ${
-        isAnimating ? "bg-black/50" : "bg-black/0"
+      className={`fixed inset-0 z-50 flex items-center justify-center transition-colors duration-300 ease-in-out ${
+        isAnimating ? "bg-background-overlay" : "bg-black/0"
       }`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
@@ -79,19 +79,19 @@ export function ChangeTargetModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="change-target-modal-title"
-        className={`bg-white dark:bg-gray-800 rounded-lg p-6 md:p-8 max-w-md md:max-w-lg mx-4 border border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out transform ${
-          isAnimating ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        className={`mx-4 max-w-md transform rounded-lg border border-border-primary bg-background-modal-content p-6 transition-all duration-300 ease-in-out md:max-w-lg md:p-8 ${
+          isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
       >
         <h3
           id="change-target-modal-title"
-          className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4"
+          className="mb-4 text-lg font-semibold text-text-primary"
         >
           Change Target for {resource.name}
         </h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-text-secondary">
               New Target Quantity
             </label>
             <input
@@ -100,21 +100,21 @@ export function ChangeTargetModal({
               value={target}
               onChange={(e) => setTarget(Number(e.target.value) || 0)}
               onKeyDown={handleKeyDown}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full rounded-lg border border-border-secondary bg-background-modal-content-inset px-3 py-2 text-text-primary"
             />
           </div>
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-text-danger">{error}</p>}
         </div>
-        <div className="flex gap-3 justify-end mt-6">
+        <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg transition-colors"
+            className="rounded-lg bg-button-secondary-bg px-4 py-2 text-sm font-medium text-button-secondary-text transition-colors hover:bg-button-secondary-bg-hover"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+            className="rounded-lg bg-button-primary-bg px-4 py-2 text-sm font-medium text-text-white transition-colors hover:bg-button-primary-bg-hover"
           >
             Save
           </button>

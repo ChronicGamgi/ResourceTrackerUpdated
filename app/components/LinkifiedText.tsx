@@ -40,7 +40,7 @@ const LinkifiedText: React.FC<LinkifiedTextProps> = ({ text }) => {
           href={cleanUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-blue-500 hover:underline break-all"
+          className="break-all text-text-link hover:underline"
         >
           {cleanUrl}
         </a>,

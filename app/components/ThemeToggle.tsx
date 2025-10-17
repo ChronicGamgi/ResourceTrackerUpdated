@@ -8,16 +8,16 @@ export function ThemeToggle() {
   return (
     <button
       onClick={toggleTheme}
-      className="relative inline-flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-all duration-200 group"
+      className="group relative inline-flex h-10 w-10 items-center justify-center rounded-lg bg-background-tertiary transition-all duration-200 hover:bg-background-secondary"
       aria-label="Toggle theme"
       title={`Switch to ${theme === "light" ? "dark" : "light"} mode`}
     >
       {/* Sun Icon */}
       <svg
-        className={`absolute h-5 w-5 text-yellow-500 transition-all duration-300 ${
+        className={`absolute h-5 w-5 text-text-warning transition-all duration-300 ${
           theme === "dark"
-            ? "rotate-90 scale-0 opacity-0"
-            : "rotate-0 scale-100 opacity-100"
+            ? "scale-0 rotate-90 opacity-0"
+            : "scale-100 rotate-0 opacity-100"
         }`}
         fill="none"
         stroke="currentColor"
@@ -33,10 +33,10 @@ export function ThemeToggle() {
 
       {/* Moon Icon */}
       <svg
-        className={`absolute h-5 w-5 text-blue-500 transition-all duration-300 ${
+        className={`absolute h-5 w-5 text-text-link transition-all duration-300 ${
           theme === "light"
-            ? "-rotate-90 scale-0 opacity-0"
-            : "rotate-0 scale-100 opacity-100"
+            ? "scale-0 -rotate-90 opacity-0"
+            : "scale-100 rotate-0 opacity-100"
         }`}
         fill="none"
         stroke="currentColor"
@@ -51,7 +51,7 @@ export function ThemeToggle() {
       </svg>
 
       {/* Hover effect */}
-      <div className="absolute inset-0 rounded-lg bg-linear-to-r from-yellow-400 to-blue-500 opacity-0 group-hover:opacity-10 transition-opacity duration-200"></div>
+      <div className="absolute inset-0 rounded-lg bg-background-toggle-hover opacity-0 transition-opacity duration-200 group-hover:opacity-10"></div>
     </button>
   );
 }

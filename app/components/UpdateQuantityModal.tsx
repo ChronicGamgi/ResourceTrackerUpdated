@@ -187,8 +187,8 @@ export function UpdateQuantityModal({
 
   return (
     <div
-      className={`fixed inset-0 flex items-center justify-center z-50 transition-colors duration-300 ease-in-out ${
-        isAnimating ? "bg-black/50" : "bg-black/0"
+      className={`fixed inset-0 z-50 flex items-center justify-center transition-colors duration-300 ease-in-out ${
+        isAnimating ? "bg-background-overlay" : "bg-black/0"
       }`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
@@ -200,20 +200,20 @@ export function UpdateQuantityModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="update-quantity-modal-title"
-        className={`bg-white dark:bg-gray-800 rounded-lg p-6 md:p-8 max-w-md md:max-w-lg mx-4 border border-gray-200 dark:border-gray-700 transition-all duration-300 ease-in-out transform ${
-          isAnimating ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        className={`mx-4 max-w-md transform rounded-lg border border-border-primary bg-background-modal-content p-6 transition-all duration-300 ease-in-out md:max-w-lg md:p-8 ${
+          isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
       >
         <h3
           id="update-quantity-modal-title"
-          className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4"
+          className="mb-4 text-lg font-semibold text-text-primary"
         >
           {updateType === UPDATE_TYPE.ABSOLUTE ? "Set" : "Add/Remove"}{" "}
           {resource.name}
         </h3>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-text-secondary">
               {updateType === UPDATE_TYPE.ABSOLUTE ? "New Quantity" : "Amount"}
             </label>
             <input
@@ -223,12 +223,12 @@ export function UpdateQuantityModal({
                 setAmount(Math.max(0, parseInt(e.target.value) || 0))
               }
               onKeyDown={handleKeyDown}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full rounded-lg border border-border-secondary bg-background-modal-content-inset px-3 py-2 text-text-primary"
               min="0"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-text-secondary">
               Base
             </label>
             <select
@@ -236,7 +236,7 @@ export function UpdateQuantityModal({
               onChange={(e) =>
                 setQuantityField(e.target.value as QuantityField)
               }
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full rounded-lg border border-border-secondary bg-background-modal-content-inset px-3 py-2 text-text-primary"
             >
               <option value={QUANTITY_FIELD.HAGGA}>Hagga</option>
               <option value={QUANTITY_FIELD.DEEP_DESERT}>Deep Desert</option>
@@ -245,18 +245,18 @@ export function UpdateQuantityModal({
 
           {session?.user.permissions?.hasResourceAdminAccess && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <label className="mb-1 block text-sm font-medium text-text-secondary">
                 On Behalf Of (Admin)
               </label>
               {userFetchError ? (
-                <div className="text-red-500 text-sm p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
+                <div className="rounded-md bg-background-danger p-2 text-sm text-text-danger">
                   Error: {userFetchError}
                 </div>
               ) : (
                 <select
                   value={onBehalfOf}
                   onChange={(e) => setOnBehalfOf(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+                  className="w-full rounded-lg border border-border-secondary bg-background-modal-content-inset px-3 py-2 text-text-primary"
                   disabled={users.length === 0}
                 >
                   <option value="">Current User</option>
@@ -273,34 +273,34 @@ export function UpdateQuantityModal({
             </div>
           )}
 
-          {error && <p className="text-red-500 text-sm">{error}</p>}
+          {error && <p className="text-sm text-text-danger">{error}</p>}
         </div>
-        <div className="space-y-4 mt-4">
+        <div className="mt-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="mb-1 block text-sm font-medium text-text-secondary">
               Notes (Optional)
             </label>
             <textarea
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              className="w-full rounded-lg border border-border-secondary bg-background-modal-content-inset px-3 py-2 text-text-primary"
               maxLength={250}
               rows={3}
               placeholder="Add a reason for the change..."
             />
           </div>
         </div>
-        <div className="flex gap-3 justify-end mt-6">
+        <div className="mt-6 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-600 hover:bg-gray-200 dark:hover:bg-gray-500 rounded-lg transition-colors"
+            className="rounded-lg bg-button-secondary-bg px-4 py-2 text-sm font-medium text-button-secondary-text transition-colors hover:bg-button-secondary-bg-hover"
           >
             Cancel
           </button>
           {updateType === UPDATE_TYPE.ABSOLUTE ? (
             <button
               onClick={handleUpdate}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600 rounded-lg transition-colors"
+              className="rounded-lg bg-button-primary-bg px-4 py-2 text-sm font-medium text-text-white transition-colors hover:bg-button-primary-bg-hover"
             >
               Set
             </button>
@@ -308,13 +308,13 @@ export function UpdateQuantityModal({
             <>
               <button
                 onClick={handleRemove}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 rounded-lg transition-colors"
+                className="rounded-lg bg-button-danger-bg px-4 py-2 text-sm font-medium text-text-white transition-colors hover:bg-button-danger-bg-hover"
               >
                 Remove
               </button>
               <button
                 onClick={handleAdd}
-                className="px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 dark:bg-green-500 dark:hover:bg-green-600 rounded-lg transition-colors"
+                className="rounded-lg bg-button-success-bg px-4 py-2 text-sm font-medium text-text-white transition-colors hover:bg-button-success-bg-hover"
               >
                 Add
               </button>

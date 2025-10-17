@@ -19,7 +19,7 @@ export function LogoutButton({
     return (
       <button
         onClick={handleSignOut}
-        className={`bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white px-6 py-3 rounded-lg transition-colors font-semibold ${
+        className={`rounded-lg bg-button-danger-bg px-6 py-3 font-semibold text-text-white transition-colors hover:bg-button-danger-bg-hover ${
           fullWidth ? "w-full" : ""
         }`}
       >
@@ -31,7 +31,7 @@ export function LogoutButton({
   return (
     <button
       onClick={handleSignOut}
-      className="bg-red-600 hover:bg-red-700 dark:bg-red-500 dark:hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+      className="rounded-lg bg-button-danger-bg px-4 py-2 text-text-white transition-colors hover:bg-button-danger-bg-hover"
     >
       Sign Out
     </button>

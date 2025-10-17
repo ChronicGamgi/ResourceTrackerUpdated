@@ -114,8 +114,8 @@ export function WhatsNewModal({
 
   return (
     <div
-      className={`fixed inset-0 flex items-center justify-center p-4 z-50 transition-colors duration-300 ease-in-out ${
-        isAnimating ? "bg-black/50" : "bg-black/0"
+      className={`fixed inset-0 z-50 flex items-center justify-center p-4 transition-colors duration-300 ease-in-out ${
+        isAnimating ? "bg-background-overlay" : "bg-black/0"
       }`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
@@ -127,18 +127,18 @@ export function WhatsNewModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="whats-new-modal-title"
-        className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full flex flex-col max-h-[80vh] transition-all duration-300 ease-in-out transform ${
-          isAnimating ? "opacity-100 scale-100" : "opacity-0 scale-95"
+        className={`flex max-h-[80vh] w-full max-w-4xl transform flex-col rounded-lg bg-background-primary shadow-xl transition-all duration-300 ease-in-out ${
+          isAnimating ? "scale-100 opacity-100" : "scale-95 opacity-0"
         }`}
       >
         {/* Header */}
-        <div className="bg-linear-to-r from-blue-600 to-blue-700 text-white p-6 rounded-t-lg flex-shrink-0">
+        <div className="bg-modal-header-gradient flex-shrink-0 rounded-t-lg p-6 text-text-primary">
           <div className="flex items-center justify-between">
             <div>
               <h2 id="whats-new-modal-title" className="text-2xl font-bold">
                 What&apos;s New
               </h2>
-              <p className="text-blue-100 mt-1">
+              <p className="mt-1 text-modal-header-text">
                 Latest updates and improvements
               </p>
             </div>
@@ -147,28 +147,28 @@ export function WhatsNewModal({
                 href="https://github.com/sininspira2/ResourceTracker/issues/new"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-600 transition-colors"
+                className="rounded-full p-1 text-modal-header-text transition-colors hover:bg-modal-header-icon-hover-bg hover:text-white"
                 aria-label="Report a Bug"
                 title="Report a Bug"
               >
-                <Bug className="w-6 h-6" />
+                <Bug className="h-6 w-6" />
               </a>
               <a
                 href="https://github.com/sininspira2/ResourceTracker"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-600 transition-colors"
+                className="rounded-full p-1 text-modal-header-text transition-colors hover:bg-modal-header-icon-hover-bg hover:text-white"
                 aria-label="Visit project Github"
                 title="Visit project Github"
               >
-                <Github className="w-6 h-6" />
+                <Github className="h-6 w-6" />
               </a>
               <button
                 onClick={() => handleClose(true)}
-                className="text-blue-100 hover:text-white p-1 rounded-full hover:bg-blue-600 transition-colors"
+                className="rounded-full p-1 text-modal-header-text transition-colors hover:bg-modal-header-icon-hover-bg hover:text-white"
               >
                 <svg
-                  className="w-6 h-6"
+                  className="h-6 w-6"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -188,7 +188,7 @@ export function WhatsNewModal({
         {/* Content */}
         <div
           ref={contentRef}
-          className={`p-6 flex-grow transition-all duration-300 ease-in-out ${
+          className={`flex-grow p-6 transition-all duration-300 ease-in-out ${
             isContentVisible ? "opacity-100" : "opacity-0"
           } ${isExpanded ? "overflow-y-auto" : "overflow-y-hidden"} ${
             // Height transition logic
@@ -202,17 +202,17 @@ export function WhatsNewModal({
           {releases.map((release) => (
             <div key={release.version} className="mb-8 last:mb-0">
               {/* Release Header */}
-              <div className="flex items-center justify-between mb-4">
+              <div className="mb-4 flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-3">
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                    <h3 className="text-xl font-bold text-text-primary">
                       {release.title}
                     </h3>
-                    <span className="text-sm bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded-sm">
+                    <span className="rounded-sm bg-version-tag-bg px-2 py-1 text-sm text-version-tag-text">
                       v{release.version}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  <p className="mt-1 text-sm text-text-tertiary">
                     Released {release.date}
                   </p>
                 </div>
@@ -223,11 +223,11 @@ export function WhatsNewModal({
                 {release.changes.map((change: any, index: number) => (
                   <div key={index} className="flex items-start gap-3">
                     <span
-                      className={`text-sm px-2 py-1 rounded-full ${getChangeTypeColor(change.type)}`}
+                      className={`rounded-full px-2 py-1 text-sm ${getChangeTypeColor(change.type)}`}
                     >
                       {getChangeTypeIcon(change.type)}
                     </span>
-                    <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed">
+                    <p className="text-sm leading-relaxed text-text-secondary">
                       {change.description}
                     </p>
                   </div>
@@ -238,12 +238,12 @@ export function WhatsNewModal({
         </div>
 
         {/* Footer */}
-        <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 rounded-b-lg flex gap-3 flex-shrink-0 items-center">
+        <div className="flex flex-shrink-0 items-center gap-3 rounded-b-lg bg-background-secondary px-6 py-4">
           {/* See More button - aligned to the left */}
           {isOverflowing && !isExpanded && (
             <button
               onClick={() => setIsExpanded(true)}
-              className="px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-text-link transition-colors hover:text-text-link-hover"
             >
               See More
             </button>
@@ -257,13 +257,13 @@ export function WhatsNewModal({
             <>
               <button
                 onClick={() => handleClose(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-500 transition-colors"
+                className="rounded-lg border border-border-secondary bg-button-secondary-bg px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-button-secondary-bg-hover"
               >
                 Remind Me Later
               </button>
               <button
                 onClick={() => handleClose(true)}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                className="rounded-lg bg-button-primary-bg px-4 py-2 text-sm font-medium text-text-white transition-colors hover:bg-button-primary-bg-hover"
               >
                 Got It!
               </button>
@@ -272,7 +272,7 @@ export function WhatsNewModal({
           {(forceShow || externalIsOpen !== undefined) && (
             <button
               onClick={() => handleClose(false)}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+              className="rounded-lg bg-button-primary-bg px-4 py-2 text-sm font-medium text-text-white transition-colors hover:bg-button-primary-bg-hover"
             >
               Close
             </button>
