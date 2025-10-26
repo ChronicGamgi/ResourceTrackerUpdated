@@ -1,6 +1,6 @@
 {
   "name": "resource-tracker",
-  "version": "4.1.1",
+  "version": "4.1.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -22,6 +22,7 @@
     "add-resources-with-images": "tsx --env-file .env.local scripts/add-resources-with-images.ts"
   },
   "dependencies": {
+    "@headlessui/react": "^2.2.9",
     "@libsql/client": "^0.15.15",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.44.6",
@@ -29,6 +30,7 @@
     "nanoid": "^5.1.6",
     "next": "^15.1.1",
     "next-auth": "^4.24.5",
+    "papaparse": "^5.5.3",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-icons": "^5.5.0",
@@ -36,12 +38,15 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
+    "@playwright/test": "^1.56.1",
     "@swc/jest": "^0.2.39",
     "@tailwindcss/postcss": "^4.1.14",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.18.10",
+    "@types/node": "^22.18.12",
+    "@types/papaparse": "^5.3.16",
     "@types/react": "^19.2.0",
     "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.5",
@@ -49,10 +54,10 @@
     "eslint-config-next": "^15.5.4",
     "jest": "^30.2.0",
     "jest-environment-jsdom": "^30.2.0",
-    "node-fetch": "^2.7.0",
+    "node-fetch": "^3.3.2",
     "postcss": "^8.4.32",
     "prettier": "^3.6.2",
-    "prettier-plugin-tailwindcss": "^0.7.0",
+    "prettier-plugin-tailwindcss": "^0.7.1",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"

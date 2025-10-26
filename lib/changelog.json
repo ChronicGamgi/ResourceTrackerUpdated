@@ -1,6 +1,62 @@
 {
-  "currentVersion": "4.1.1",
+  "currentVersion": "4.1.3",
   "releases": [
+    {
+      "version": "4.1.3",
+      "date": "2025-10-24",
+      "title": "Resource Tier System and Multi-Select Filtering",
+      "type": "minor",
+      "changes": [
+        {
+          "type": "feature",
+          "description": "Introduced a 'tier' attribute for resources, allowing for granular classification. Tiers can be managed via the edit modal and include distinct styling on resource detail pages."
+        },
+        {
+          "type": "feature",
+          "description": "Upgraded the resource table filtering system to support simultaneous multi-selection for status, category, and the new 'tier' attribute."
+        },
+        {
+          "type": "improvement",
+          "description": "Integrated a new 'MultiSelectDropdown' component to enhance the UI and power the new filtering capabilities."
+        },
+        {
+          "type": "info",
+          "description": "Database Migration: A migration is *not* necessary for this update unless you see a yellow warning banner above the navigation bar. The required schema changes were included in a previous release (v4.1.0)."
+        }
+      ]
+    },
+    {
+      "version": "4.1.2",
+      "date": "2025-10-23",
+      "title": "CSV Data Import/Export and UI/Validation Enhancements",
+      "type": "minor",
+      "changes": [
+        {
+          "type": "feature",
+          "description": "Added CSV Import/Export feature for resource data (name, quantities, targets) on the Resources page, available to users with 'canEditTargets' permissions."
+        },
+        {
+          "type": "feature",
+          "description": "The import workflow includes a confirmation modal, a preview of changes, and robust file validation (file type and size) on both the client and server."
+        },
+        {
+          "type": "improvement",
+          "description": "Adjusted the 'ClientNavigation' component to responsively move the version button below the page title on mobile viewports for a cleaner layout."
+        },
+        {
+          "type": "improvement",
+          "description": "Improved accessibility in the import modal by associating the file input with a 'label' for better screen reader support."
+        },
+        {
+          "type": "bugfix",
+          "description": "Fixed Jest compatibility issues related to 'node-fetch v3' to stabilize the testing environment."
+        },
+        {
+          "type": "other",
+          "description": "Enhanced CI/CD pipeline, added API test coverage, and bumped minor dependencies including '@types/node'."
+        }
+      ]
+    },
     {
       "version": "4.1.1",
       "date": "2025-10-16",

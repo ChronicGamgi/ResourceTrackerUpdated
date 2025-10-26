@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CATEGORY_OPTIONS } from "@/lib/constants";
+import { CATEGORY_OPTIONS, TIER_OPTIONS } from "@/lib/constants";
 
 interface Resource {
   id: string;
@@ -11,6 +11,7 @@ interface Resource {
   imageUrl?: string;
   multiplier?: number;
   isPriority?: boolean;
+  tier?: number;
 }
 
 interface EditResourceModalProps {
@@ -29,6 +30,7 @@ export function EditResourceModal({
   const [formData, setFormData] = useState({
     name: "",
     category: "Raw",
+    tier: null as number | null,
     description: "",
     imageUrl: "",
     multiplier: 1.0,
@@ -56,6 +58,7 @@ export function EditResourceModal({
       setFormData({
         name: resource.name,
         category: resource.category || "Raw",
+        tier: resource.tier ?? null,
         description: resource.description || "",
         imageUrl: resource.imageUrl || "",
         multiplier: resource.multiplier || 1.0,
@@ -145,7 +148,10 @@ export function EditResourceModal({
 
         <div className="space-y-4">
           <div>
-            <label htmlFor="name-input" className="mb-1 block text-sm font-medium text-text-secondary">
+            <label
+              htmlFor="name-input"
+              className="mb-1 block text-sm font-medium text-text-secondary"
+            >
               Name *
             </label>
             <input
@@ -161,7 +167,10 @@ export function EditResourceModal({
           </div>
 
           <div>
-            <label htmlFor="category-select" className="mb-1 block text-sm font-medium text-text-secondary">
+            <label
+              htmlFor="category-select"
+              className="mb-1 block text-sm font-medium text-text-secondary"
+            >
               Category
             </label>
             <select
@@ -181,7 +190,37 @@ export function EditResourceModal({
           </div>
 
           <div>
-            <label htmlFor="description-textarea" className="mb-1 block text-sm font-medium text-text-secondary">
+            <label
+              htmlFor="tier-select"
+              className="mb-1 block text-sm font-medium text-text-secondary"
+            >
+              Tier
+            </label>
+            <select
+              id="tier-select"
+              value={formData.tier ?? ""}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  tier: e.target.value ? parseInt(e.target.value) : null,
+                })
+              }
+              className="w-full rounded-lg border border-border-secondary bg-background-modal-content-inset px-3 py-2 text-text-primary"
+            >
+              <option value="">None</option>
+              {TIER_OPTIONS.map((tier) => (
+                <option key={tier.value} value={tier.value}>
+                  {tier.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label
+              htmlFor="description-textarea"
+              className="mb-1 block text-sm font-medium text-text-secondary"
+            >
               Description
             </label>
             <textarea
@@ -196,7 +235,10 @@ export function EditResourceModal({
           </div>
 
           <div>
-            <label htmlFor="image-url-input" className="mb-1 block text-sm font-medium text-text-secondary">
+            <label
+              htmlFor="image-url-input"
+              className="mb-1 block text-sm font-medium text-text-secondary"
+            >
               Image URL
             </label>
             <input
@@ -212,7 +254,10 @@ export function EditResourceModal({
           </div>
 
           <div>
-            <label htmlFor="multiplier-input" className="mb-1 block text-sm font-medium text-text-secondary">
+            <label
+              htmlFor="multiplier-input"
+              className="mb-1 block text-sm font-medium text-text-secondary"
+            >
               Points Multiplier
             </label>
             <input
