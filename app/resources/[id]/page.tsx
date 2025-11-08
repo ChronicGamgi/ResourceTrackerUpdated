@@ -106,6 +106,7 @@ interface Resource {
   quantityDeepDesert: number;
   description?: string;
   category?: string;
+  subcategory?: string;
   icon?: string;
   imageUrl?: string;
   targetQuantity?: number;
@@ -880,11 +881,16 @@ export default function ResourceDetailPage() {
                                   : resource.category === "Components"
                                     ? "bg-category-components-bg text-category-components-text"
                                     : resource.category === "Blueprints"
-                                      ? "bg-category-bp-bg"
+                                      ? "bg-category-bp-bg text-text-secondary"
                                       : "bg-category-other-bg text-category-other-text"
                             }`}
                           >
                             {resource.category}
+                          </span>
+                        )}
+                        {resource.subcategory && (
+                          <span className="inline-flex rounded-full bg-subcategory-bg px-3 py-1 text-sm font-semibold text-subcategory-text">
+                            {resource.subcategory}
                           </span>
                         )}
                         <span
