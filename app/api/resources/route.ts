@@ -2,25 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions, getUserIdentifier } from "@/lib/auth";
 import { db, resources, resourceHistory } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { hasResourceAccess, hasResourceAdminAccess } from "@/lib/discord-roles";
 import { nanoid } from "nanoid";
 import { awardPoints } from "@/lib/leaderboard";
+import { calculateResourceStatus } from "@/lib/resource-utils";
 
-// Calculate status based on quantity vs target
-const calculateResourceStatus = (
-  quantity: number,
-  targetQuantity: number | null,
-): "above_target" | "at_target" | "below_target" | "critical" => {
-  if (!targetQuantity || targetQuantity <= 0) return "at_target";
-
-  const percentage = (quantity / targetQuantity) * 100;
-  if (percentage >= 150) return "above_target"; // Purple - well above target
-  if (percentage >= 100) return "at_target"; // Green - at or above target
-  if (percentage >= 50) return "below_target"; // Orange - below target but not critical
-  return "critical"; // Red - very much below target
-};
-
+/**
+ * GET /api/resources
+ *
+ * Proxies the request to the internal cached resources endpoint
+ * (`/api/internal/resources`) and returns the result. Query parameters
+ * (filters, pagination, etc.) are forwarded as-is.
+ */
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const internalUrl = new URL(
@@ -67,7 +61,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/resources - Create new resource (admin only)
+/**
+ * POST /api/resources
+ *
+ * Creates a new resource. Requires resource admin access.
+ * Inserts the resource and logs the initial quantity as a history entry
+ * within a single database transaction.
+ *
+ * Request body: `{ name, category, subcategory?, tier?, description?, imageUrl?,
+ * quantity?, quantityHagga?, quantityDeepDesert?, targetQuantity?, multiplier? }`
+ */
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -115,7 +118,8 @@ export async function POST(request: NextRequest) {
       tier: tier || null,
       imageUrl: imageUrl || null,
       targetQuantity: targetQuantity || null,
-      multiplier: multiplier || 1.0,
+      multiplier:
+        typeof multiplier === "number" && multiplier > 0 && multiplier <= 100 && Number.isFinite(multiplier) ? multiplier : 1.0,
       lastUpdatedBy: userId,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -162,7 +166,16 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT /api/resources - Update multiple resources or single resource metadata
+/**
+ * PUT /api/resources
+ *
+ * Handles two update modes based on the request body:
+ * - **`resourceMetadata`**: Updates a single resource's metadata fields (admin only).
+ * - **`resourceUpdates`**: Bulk-updates Hagga quantities for multiple resources,
+ *   logging history entries and awarding leaderboard points for each change.
+ *
+ * Requires resource access for bulk updates; admin access for metadata updates.
+ */
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -211,7 +224,8 @@ export async function PUT(request: NextRequest) {
           subcategory: subcategory || null,
           description: description || null,
           imageUrl: imageUrl || null,
-          multiplier: multiplier || 1.0,
+          multiplier:
+            typeof multiplier === "number" && multiplier > 0 && multiplier <= 100 && Number.isFinite(multiplier) ? multiplier : 1.0,
           isPriority: isPriority || false,
           tier: tier,
           lastUpdatedBy: userId,
@@ -250,6 +264,15 @@ export async function PUT(request: NextRequest) {
         );
       }
 
+      const resourceIds = resourceUpdates.map((u: { id: string }) => u.id);
+      const currentResourcesList = await db
+        .select()
+        .from(resources)
+        .where(inArray(resources.id, resourceIds));
+      const currentResourcesMap = new Map(
+        currentResourcesList.map((r) => [r.id, r]),
+      );
+
       const updatePromises = resourceUpdates.map(
         async (update: {
           id: string;
@@ -258,13 +281,15 @@ export async function PUT(request: NextRequest) {
           value: number; // This is the change amount for relative
           reason?: string;
         }) => {
-          const currentResource = await db
-            .select()
-            .from(resources)
-            .where(eq(resources.id, update.id));
-          if (currentResource.length === 0) return null;
+          if (update.reason && update.reason.length > 500) {
+            throw new Error("Reason must be 500 characters or less");
+          }
+          if (update.reason) {
+            update.reason = update.reason.trim().replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+          }
 
-          const resource = currentResource[0];
+          const resource = currentResourcesMap.get(update.id);
+          if (!resource) return null;
           const previousQuantityHagga = resource.quantityHagga;
           const changeAmountHagga =
             update.updateType === "relative"
@@ -328,7 +353,10 @@ export async function PUT(request: NextRequest) {
         .filter((result) => result !== null)
         .reduce((total, result) => total + (result?.finalPoints || 0), 0);
 
-      const updatedResources = await db.select().from(resources);
+      const updatedResources = await db
+        .select()
+        .from(resources)
+        .where(inArray(resources.id, resourceIds));
 
       return NextResponse.json(
         {

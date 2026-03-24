@@ -18,6 +18,57 @@ interface CsvRow {
   targetQuantity: string;
 }
 
+// Formula injection prevention: prefix values that would be interpreted as
+// spreadsheet formulas (=, +, -, @, tab, carriage-return) with a single quote.
+// This follows the OWASP recommendation for CSV injection mitigation.
+const CSV_INJECTION_RE = /^[=+\-@\t\r]/;
+
+/**
+ * Sanitizes a string value for safe inclusion in a CSV file.
+ *
+ * Prefixes values that start with formula-injection characters (`=`, `+`, `-`,
+ * `@`, tab, carriage-return) with a single quote, following the OWASP
+ * recommendation for CSV injection mitigation.
+ *
+ * @param value - The raw string value to sanitize
+ * @returns The sanitized string, safe for CSV output
+ */
+function sanitizeCsvField(value: string): string {
+  return CSV_INJECTION_RE.test(value) ? `'${value}` : value;
+}
+
+/**
+ * Reverses the CSV injection prefix added by {@link sanitizeCsvField}.
+ *
+ * Some CSV editors (e.g. LibreOffice, plain-text editors) preserve the leading
+ * single-quote verbatim when re-saving; Excel treats it as a text-prefix marker
+ * and drops it. Stripping on import keeps both round-trip paths correct.
+ *
+ * Accepts `unknown` because PapaParse row fields can be `undefined` at runtime
+ * when a column is absent despite the TypeScript `CsvRow` type. Only strips the
+ * leading quote when `length > 1` so a lone `"'"` is not silently collapsed to `""`.
+ *
+ * @param value - The raw field value from the parsed CSV row
+ * @returns The desanitized string, or `""` if the value is not a string
+ */
+function desanitizeCsvField(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.length > 1 && value.startsWith("'") ? value.slice(1) : value;
+}
+
+/**
+ * GET /api/resources/bulk
+ *
+ * Exports a filtered list of resources as a CSV file. The CSV contains
+ * `id`, `name`, `quantityHagga`, `quantityDeepDesert`, and `targetQuantity`
+ * columns. String fields are sanitized against CSV injection.
+ *
+ * Supports the same filter parameters as the main resource list:
+ * `status`, `category`, `subcategory`, `tier`, `needsUpdate`, `priority`,
+ * and `searchTerm`.
+ *
+ * Requires target-edit access. Returns a `text/csv` attachment.
+ */
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -141,8 +192,8 @@ export async function GET(request: NextRequest) {
   const filteredResources = await query;
 
   const dataForCsv = filteredResources.map((r) => ({
-    id: r.id,
-    name: r.name,
+    id: sanitizeCsvField(r.id),
+    name: sanitizeCsvField(r.name),
     quantityHagga: r.quantityHagga,
     quantityDeepDesert: r.quantityDeepDesert,
     targetQuantity: r.targetQuantity,
@@ -159,6 +210,20 @@ export async function GET(request: NextRequest) {
   });
 }
 
+/**
+ * POST /api/resources/bulk
+ *
+ * Validates a CSV file upload for bulk import. Parses the CSV (up to 256 KB),
+ * checks required columns (`id`, `name`, `quantityHagga`, `quantityDeepDesert`),
+ * and returns a diff array describing the status of each row:
+ * - `"changed"` — values differ from the database
+ * - `"unchanged"` — values match the database
+ * - `"not_found"` — no resource with that ID exists
+ * - `"invalid"` — one or more values failed validation
+ *
+ * Does **not** apply any changes; use `POST /api/resources/bulk/confirm` to commit.
+ * Requires target-edit access.
+ */
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -195,7 +260,23 @@ export async function POST(request: NextRequest) {
     skipEmptyLines: true,
   });
 
-  const ids = parsed.data.map((row) => row.id).filter(Boolean);
+  const requiredColumns = ["id", "name", "quantityHagga", "quantityDeepDesert"];
+  const presentColumns = parsed.meta.fields ?? [];
+  const missingColumns = requiredColumns.filter(
+    (col) => !presentColumns.includes(col),
+  );
+  if (missingColumns.length > 0) {
+    return NextResponse.json(
+      {
+        error: `CSV is missing required columns: ${missingColumns.join(", ")}`,
+      },
+      { status: 400 },
+    );
+  }
+
+  const ids = parsed.data
+    .map((row) => desanitizeCsvField(row.id))
+    .filter(Boolean);
   if (ids.length === 0) {
     return NextResponse.json(
       { error: "No valid data found in CSV" },
@@ -210,9 +291,11 @@ export async function POST(request: NextRequest) {
   const currentResourcesMap = new Map(currentResources.map((r) => [r.id, r]));
 
   const diff = parsed.data.map((row) => {
-    const current = currentResourcesMap.get(row.id);
+    const rowId = desanitizeCsvField(row.id);
+    const rowName = desanitizeCsvField(row.name);
+    const current = currentResourcesMap.get(rowId);
     if (!current) {
-      return { id: row.id, name: row.name, status: "not_found" };
+      return { id: rowId, name: rowName, status: "not_found" };
     }
 
     const newValues: any = {};
@@ -250,7 +333,7 @@ export async function POST(request: NextRequest) {
 
     if (Object.keys(validationErrors).length > 0) {
       return {
-        id: row.id,
+        id: rowId,
         name: current.name,
         status: "invalid",
         errors: validationErrors,
@@ -276,7 +359,7 @@ export async function POST(request: NextRequest) {
 
     if (Object.values(changes).some((c) => c)) {
       return {
-        id: row.id,
+        id: rowId,
         name: current.name,
         status: "changed",
         old: {
@@ -287,7 +370,7 @@ export async function POST(request: NextRequest) {
         new: newValues,
       };
     } else {
-      return { id: row.id, name: current.name, status: "unchanged" };
+      return { id: rowId, name: current.name, status: "unchanged" };
     }
   });
 

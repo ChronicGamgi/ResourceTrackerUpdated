@@ -1,6 +1,30 @@
 {
-  "currentVersion": "4.1.4",
+  "currentVersion": "4.1.5",
   "releases": [
+    {
+      "version": "4.1.5",
+      "date": "2026-03-17",
+      "title": "Bugfixes",
+      "type": "minor",
+      "changes": [
+        {
+          "type": "bugfix",
+          "description": "Fixed CSV injection (formula injection) vulnerability in the bulk CSV export: string fields (id, name) are now prefixed with a single quote when they start with formula-trigger characters (=, +, -, @). The import endpoint strips the prefix on round-trip to remain compatible with editors that preserve it verbatim."
+        },
+        {
+          "type": "improvement",
+          "description": "Replaced N+1 queries in the bulk PUT /api/resources handler with batched inArray queries, reducing DB round-trips from N+1 to 2 regardless of update count."
+        },
+        {
+          "type": "improvement",
+          "description": "Updated npm packages to latest minor/patch versions to address security audit vulnerabilities: Next.js 15.5.13 (HTTP request smuggling fix), esbuild override to resolve high-severity transitive vulnerability in drizzle-kit dependency chain, and all other packages updated to latest compatible versions."
+        },
+        {
+          "type": "improvement",
+          "description": "Replaced next/font/google (requires network at build time) with @fontsource-variable/inter (npm-hosted font), enabling builds in offline/restricted CI environments."
+        }
+      ]
+    },
     {
       "version": "4.1.4",
       "date": "2025-10-27",

@@ -5,27 +5,26 @@ import { db } from "@/lib/db";
 import { resources, resourceHistory, users, leaderboard } from "@/lib/db";
 import { eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { hasResourceAccess, hasResourceAdminAccess } from "@/lib/discord-roles";
+import {
+  hasResourceAccess,
+  hasResourceAdminAccess,
+  hasTargetEditAccess,
+} from "@/lib/discord-roles";
 import { awardPoints } from "@/lib/leaderboard";
+import { calculateResourceStatus } from "@/lib/resource-utils";
 
-// Calculate status based on quantity vs target
-const calculateResourceStatus = (
-  quantity: number,
-  targetQuantity: number | null,
-): "above_target" | "at_target" | "below_target" | "critical" => {
-  if (!targetQuantity || targetQuantity <= 0) return "at_target";
-
-  const percentage = (quantity / targetQuantity) * 100;
-  if (percentage >= 150) return "above_target"; // Purple - well above target
-  if (percentage >= 100) return "at_target"; // Green - at or above target
-  if (percentage >= 50) return "below_target"; // Orange - below target but not critical
-  return "critical"; // Red - very much below target
-};
-
-// Import role-checking functions from discord-roles.ts
-import { hasTargetEditAccess } from "@/lib/discord-roles";
-
-// PUT /api/resources/[id] - Update single resource
+/**
+ * PUT /api/resources/[id]
+ *
+ * Updates the quantity of a single resource (Hagga or Deep Desert field).
+ * Supports both `"absolute"` (set to value) and `"relative"` (add/subtract)
+ * update types. Logs the change to resource history and awards leaderboard points.
+ *
+ * Admins may supply `onBehalfOf` (a user ID) to attribute the change to another
+ * user while still recording the acting admin in the history reason.
+ *
+ * Requires resource access. Returns the updated resource and points earned.
+ */
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -47,6 +46,35 @@ export async function PUT(
       onBehalfOf,
     } = await request.json();
     const actingUserIdentifier = getUserIdentifier(session);
+
+    if (reason && typeof reason !== 'string') {
+      return NextResponse.json({ error: "reason must be a string" }, { status: 400 });
+    }
+    if (reason && reason.length > 500) {
+      return NextResponse.json(
+        { error: "Reason must be 500 characters or less" },
+        { status: 400 },
+      );
+    }
+    if (reason) {
+      reason = reason.trim().replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
+    }
+
+    if (quantityField !== undefined && quantityField !== "quantityHagga" && quantityField !== "quantityDeepDesert") {
+      return NextResponse.json({ error: "quantityField must be 'quantityHagga' or 'quantityDeepDesert'" }, { status: 400 });
+    }
+
+    if (updateType === "absolute") {
+      if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity < 0) {
+        return NextResponse.json({ error: "quantity must be a non-negative integer for absolute updates" }, { status: 400 });
+      }
+    }
+
+    if (updateType === "relative") {
+      if (typeof changeValue !== 'number' || !Number.isInteger(changeValue) || changeValue === 0) {
+        return NextResponse.json({ error: "changeValue must be a non-zero integer for relative updates" }, { status: 400 });
+      }
+    }
 
     let effectiveUserId = actingUserIdentifier;
 
@@ -70,9 +98,16 @@ export async function PUT(
       // Use the display name for consistency in history and leaderboards
       effectiveUserId = targetUser[0].customNickname || targetUser[0].username;
 
-      // Append an audit note to the reason
-      const auditNote = `(entered by ${actingUserIdentifier})`;
-      reason = reason ? `${reason} ${auditNote}` : auditNote;
+      // Append an audit note to the reason, staying within the 500-char limit
+      const auditNote = ` (entered by ${actingUserIdentifier})`;
+      if (reason) {
+        const maxBase = 500 - auditNote.length;
+        reason =
+          (reason.length > maxBase ? reason.slice(0, maxBase) : reason) +
+          auditNote;
+      } else {
+        reason = auditNote.trimStart();
+      }
     }
 
     const result = await db.transaction(async (tx) => {
@@ -186,8 +221,9 @@ export async function PUT(
         Expires: "0",
       },
     });
-  } catch (error: any) {
-    if (error.message === "ResourceNotFound") {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage === "ResourceNotFound") {
       return NextResponse.json(
         { error: "Resource not found" },
         { status: 404 },
@@ -201,7 +237,14 @@ export async function PUT(
   }
 }
 
-// DELETE /api/resources/[id] - Delete resource and all its history (admin only)
+/**
+ * DELETE /api/resources/[id]
+ *
+ * Permanently deletes a resource along with all associated history entries and
+ * leaderboard records. Requires resource admin access.
+ *
+ * The deletion runs inside a transaction to ensure referential consistency.
+ */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -243,8 +286,9 @@ export async function DELETE(
         },
       },
     );
-  } catch (error: any) {
-    if (error.message === "ResourceNotFound") {
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    if (errorMessage === "ResourceNotFound") {
       return NextResponse.json(
         { error: "Resource not found" },
         { status: 404 },

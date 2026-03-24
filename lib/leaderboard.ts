@@ -7,14 +7,18 @@ const BASE_POINTS_PER_1000_RESOURCES = 100;
 const SET_ACTION_POINTS = 1;
 const REFINED_ACTION_POINTS = 2; // Special points for Refined category
 
-// Status bonuses (as decimal percentages)
+// Status bonuses (as decimal percentages).
+// calculateResourceStatus returns only: "critical", "below_target", "at_target", "above_target".
+// "well_stocked" and "surplus" are reserved for future status levels; they are not
+// currently produced but are kept here so the map stays complete if new statuses are added.
+// The lookup at call sites uses `|| 0` as a safe fallback for any unmapped key.
 const STATUS_BONUSES = {
   critical: 0.1, // +10%
   below_target: 0.05, // +5%
   at_target: 0.0, // 0%
   above_target: 0.0, // 0%
-  well_stocked: 0.0, // 0%
-  surplus: 0.0, // 0%
+  well_stocked: 0.0, // 0% — reserved, not currently returned by calculateResourceStatus
+  surplus: 0.0, // 0% — reserved, not currently returned by calculateResourceStatus
 };
 
 // Categories that are eligible for points (Raw, Components, and Refined)
@@ -40,7 +44,7 @@ export function calculatePoints(
   // No points for REMOVE actions or ineligible categories
   if (
     actionType === "REMOVE" ||
-    !ELIGIBLE_CATEGORIES.includes(resourceCategory as any)
+    !ELIGIBLE_CATEGORIES.includes(resourceCategory)
   ) {
     return {
       basePoints: 0,
@@ -151,6 +155,7 @@ export async function getLeaderboard(
   offset = 0,
   dbInstance: any = db,
 ): Promise<{ rankings: any[]; total: number }> {
+  const effectiveLimit = Math.max(1, limit);
   try {
     let timeCondition = sql`1 = 1`; // Default to no time filter
 
@@ -199,7 +204,7 @@ export async function getLeaderboard(
       .where(timeCondition)
       .groupBy(leaderboard.userId)
       .orderBy(desc(sql`SUM(${leaderboard.finalPoints})`))
-      .limit(limit)
+      .limit(effectiveLimit)
       .offset(offset);
 
     console.log(
@@ -222,6 +227,7 @@ export async function getUserContributions(
   offset = 0,
   dbInstance: any = db,
 ): Promise<{ contributions: any[]; summary: any; total: number }> {
+  const effectiveLimit = Math.max(1, limit);
   let timeCondition = sql`1 = 1`;
 
   if (timeFilter && timeFilter !== "all") {
@@ -258,7 +264,7 @@ export async function getUserContributions(
     .from(leaderboard)
     .where(and(eq(leaderboard.userId, userId), timeCondition))
     .orderBy(desc(leaderboard.createdAt))
-    .limit(limit)
+    .limit(effectiveLimit)
     .offset(offset);
 
   const summaryResult = await dbInstance

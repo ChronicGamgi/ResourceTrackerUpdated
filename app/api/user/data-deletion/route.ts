@@ -5,7 +5,18 @@ import { db, resourceHistory } from "@/lib/db";
 import { eq, or } from "drizzle-orm";
 import { hasResourceAccess } from "@/lib/discord-roles";
 
-// POST /api/user/data-deletion - Request deletion of user data (GDPR compliance)
+/**
+ * POST /api/user/data-deletion
+ *
+ * Processes a GDPR data deletion request for the currently authenticated user.
+ * Rather than hard-deleting records (which would break aggregate statistics),
+ * all resource history entries attributed to the user are anonymized by
+ * replacing the user identifier with a unique random token and clearing the
+ * reason field.
+ *
+ * Requires resource access. Returns the count of records affected and the
+ * anonymization timestamp.
+ */
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -52,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     // Option 2: Anonymization (preserves statistics while protecting privacy)
     // This replaces the user identifier with an anonymized version
-    const anonymizedId = `deleted-user-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const anonymizedId = `deleted-user-${crypto.randomUUID()}`;
 
     await db
       .update(resourceHistory)
