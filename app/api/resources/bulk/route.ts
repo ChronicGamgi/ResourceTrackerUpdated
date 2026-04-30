@@ -8,15 +8,9 @@ import Papa from "papaparse";
 import {
   UPDATE_THRESHOLD_NON_PRIORITY_MS,
   UPDATE_THRESHOLD_PRIORITY_MS,
+  TIER_OPTIONS,
 } from "@/lib/constants";
-
-interface CsvRow {
-  id: string;
-  name: string;
-  quantityHagga: string;
-  quantityDeepDesert: string;
-  targetQuantity: string;
-}
+import { getLocationNames } from "@/lib/global-settings";
 
 // Formula injection prevention: prefix values that would be interpreted as
 // spreadsheet formulas (=, +, -, @, tab, carriage-return) with a single quote.
@@ -56,12 +50,17 @@ function desanitizeCsvField(value: unknown): string {
   return value.length > 1 && value.startsWith("'") ? value.slice(1) : value;
 }
 
+function getTierLabel(tier: number | null | undefined): string {
+  if (tier === null || tier === undefined) return "";
+  return TIER_OPTIONS.find((t) => t.value === tier.toString())?.label ?? "";
+}
+
 /**
  * GET /api/resources/bulk
  *
  * Exports a filtered list of resources as a CSV file. The CSV contains
- * `id`, `name`, `quantityHagga`, `quantityDeepDesert`, and `targetQuantity`
- * columns. String fields are sanitized against CSV injection.
+ * `id`, `name`, `tier` (read-only label), the two location quantity columns,
+ * and `targetQuantity` columns. String fields are sanitized against CSV injection.
  *
  * Supports the same filter parameters as the main resource list:
  * `status`, `category`, `subcategory`, `tier`, `needsUpdate`, `priority`,
@@ -191,11 +190,37 @@ export async function GET(request: NextRequest) {
     .where(and(...whereConditions));
   const filteredResources = await query;
 
+  const { location1Name, location2Name } = await getLocationNames();
+
+  const EXPORT_RESERVED = new Set([
+    "id",
+    "name",
+    "tier",
+    "targetQuantity",
+    "quantityHagga",
+    "quantityDeepDesert",
+  ]);
+  const conflictingNames = [location1Name, location2Name].filter((n) =>
+    EXPORT_RESERVED.has(n),
+  );
+  if (conflictingNames.length > 0 || location1Name === location2Name) {
+    const reserved = Array.from(EXPORT_RESERVED).join(", ");
+    const detail =
+      location1Name === location2Name
+        ? `location names must not be identical ("${location1Name}")`
+        : `"${conflictingNames.join('", "')}" conflicts with reserved column names (${reserved})`;
+    return NextResponse.json(
+      { error: `Location names are misconfigured: ${detail}.` },
+      { status: 500 },
+    );
+  }
+
   const dataForCsv = filteredResources.map((r) => ({
     id: sanitizeCsvField(r.id),
     name: sanitizeCsvField(r.name),
-    quantityHagga: r.quantityHagga,
-    quantityDeepDesert: r.quantityDeepDesert,
+    tier: getTierLabel(r.tier),
+    [location1Name]: r.quantityHagga,
+    [location2Name]: r.quantityDeepDesert,
     targetQuantity: r.targetQuantity,
   }));
 
@@ -255,16 +280,54 @@ export async function POST(request: NextRequest) {
   }
 
   const csvData = await file.text();
-  const parsed = Papa.parse<CsvRow>(csvData, {
+  const parsed = Papa.parse<Record<string, string>>(csvData, {
     header: true,
     skipEmptyLines: true,
   });
 
-  const requiredColumns = ["id", "name", "quantityHagga", "quantityDeepDesert"];
+  const { location1Name, location2Name } = await getLocationNames();
   const presentColumns = parsed.meta.fields ?? [];
-  const missingColumns = requiredColumns.filter(
-    (col) => !presentColumns.includes(col),
-  );
+
+  const IMPORT_RESERVED = new Set([
+    "id",
+    "name",
+    "quantityHagga",
+    "quantityDeepDesert",
+  ]);
+  const loc1NameValid =
+    !IMPORT_RESERVED.has(location1Name) && location1Name !== location2Name;
+  const loc2NameValid =
+    !IMPORT_RESERVED.has(location2Name) && location1Name !== location2Name;
+  if (!loc1NameValid || !loc2NameValid) {
+    return NextResponse.json(
+      {
+        error:
+          "Location names are misconfigured: they must not match reserved column names (id, name, quantityHagga, quantityDeepDesert) or be identical to each other.",
+      },
+      { status: 500 },
+    );
+  }
+
+  // Accept either the validated configured name or the legacy column name
+  const loc1Key =
+    loc1NameValid && presentColumns.includes(location1Name)
+      ? location1Name
+      : presentColumns.includes("quantityHagga")
+        ? "quantityHagga"
+        : null;
+  const loc2Key =
+    loc2NameValid && presentColumns.includes(location2Name)
+      ? location2Name
+      : presentColumns.includes("quantityDeepDesert")
+        ? "quantityDeepDesert"
+        : null;
+
+  const missingColumns = [
+    ...(!presentColumns.includes("id") ? ["id"] : []),
+    ...(!presentColumns.includes("name") ? ["name"] : []),
+    ...(!loc1Key ? [`${location1Name} or quantityHagga`] : []),
+    ...(!loc2Key ? [`${location2Name} or quantityDeepDesert`] : []),
+  ];
   if (missingColumns.length > 0) {
     return NextResponse.json(
       {
@@ -302,19 +365,19 @@ export async function POST(request: NextRequest) {
     const validationErrors: any = {};
 
     const validateAndSet = (
-      value: any,
-      fieldName: "quantityHagga" | "quantityDeepDesert",
+      value: unknown,
+      internalField: "quantityHagga" | "quantityDeepDesert",
     ) => {
       const num = Number(value);
       if (isNaN(num) || num < 0 || !Number.isInteger(num)) {
-        validationErrors[fieldName] = "Must be a positive integer";
+        validationErrors[internalField] = "Must be a positive integer";
       } else {
-        newValues[fieldName] = num;
+        newValues[internalField] = num;
       }
     };
 
-    validateAndSet(row.quantityHagga, "quantityHagga");
-    validateAndSet(row.quantityDeepDesert, "quantityDeepDesert");
+    validateAndSet(desanitizeCsvField(row[loc1Key!]), "quantityHagga");
+    validateAndSet(desanitizeCsvField(row[loc2Key!]), "quantityDeepDesert");
 
     // Validate targetQuantity
     const newTargetRaw = row.targetQuantity;
@@ -343,9 +406,9 @@ export async function POST(request: NextRequest) {
           targetQuantity: current.targetQuantity,
         },
         new: {
-          quantityHagga: row.quantityHagga,
-          quantityDeepDesert: row.quantityDeepDesert,
-          targetQuantity: row.targetQuantity,
+          quantityHagga: desanitizeCsvField(row[loc1Key!]),
+          quantityDeepDesert: desanitizeCsvField(row[loc2Key!]),
+          targetQuantity: desanitizeCsvField(row.targetQuantity),
         },
       };
     }

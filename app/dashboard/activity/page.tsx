@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { useLocationNames } from "@/app/context/LocationNamesContext";
+import { PageContainer } from "@/app/components/PageContainer";
+import { AppShell } from "@/app/components/AppShell";
 // Note: hasResourceAccess now computed server-side and available in session.user.permissions
 
 // Utility function to format numbers with commas
@@ -48,7 +50,11 @@ interface ActivityEntry {
   newQuantityDeepDesert: number;
   changeAmountDeepDesert: number;
   transferAmount?: number;
-  transferDirection?: "to_deep_desert" | "to_hagga";
+  transferDirection?:
+    | "to_deep_desert"
+    | "to_hagga"
+    | "transfer_to_location_2"
+    | "transfer_to_location_1";
   changeAmount: number; // This is the total change amount, added in the API
   changeType: "absolute" | "relative" | "transfer";
   reason?: string;
@@ -58,6 +64,7 @@ interface ActivityEntry {
 export default function ActivityLogPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const { location1Name, location2Name } = useLocationNames();
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState(30); // days
@@ -117,54 +124,40 @@ export default function ActivityLogPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background-primary">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-text-link"></div>
-          <p className="mt-4 text-text-tertiary">Loading...</p>
+      <AppShell>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-text-link"></div>
+            <p className="mt-4 text-text-tertiary">Loading...</p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background-primary transition-colors duration-300">
-      {/* Header */}
-      <div className="border-b border-border-primary bg-background-secondary shadow-xs">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                href="/dashboard"
-                className="flex items-center text-text-tertiary transition-colors hover:text-text-primary"
-              >
-                <ArrowLeft className="h-5 w-5 sm:mr-2" />
-                <span className="hidden sm:inline">Back to Dashboard</span>
-              </Link>
-              <div className="h-6 w-px bg-border-secondary"></div>
-              <h1 className="text-xl font-semibold text-text-primary">
-                Your Activity Log
-              </h1>
-            </div>
-            <div className="flex items-center gap-4">
-              <span className="text-sm text-text-tertiary">Time Range:</span>
-              <select
-                value={timeFilter}
-                onChange={(e) => setTimeFilter(parseInt(e.target.value))}
-                className="rounded-sm border border-border-secondary bg-background-primary px-3 py-1 text-sm text-text-primary"
-              >
-                <option value={7}>Last 7 days</option>
-                <option value={14}>Last 14 days</option>
-                <option value={30}>Last 30 days</option>
-                <option value={90}>Last 3 months</option>
-                <option value={365}>Last year</option>
-              </select>
-            </div>
+    <AppShell>
+      {/* Main Content */}
+      <PageContainer className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-text-primary">
+            Your Activity Log
+          </h1>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-text-tertiary">Time Range:</span>
+            <select
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(parseInt(e.target.value))}
+              className="rounded-sm border border-border-secondary bg-background-primary px-3 py-1 text-sm text-text-primary"
+            >
+              <option value={7}>Last 7 days</option>
+              <option value={14}>Last 14 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={90}>Last 3 months</option>
+              <option value={365}>Last year</option>
+            </select>
           </div>
         </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
         {loading ? (
           <div className="py-12 text-center">
             <div className="mx-auto h-8 w-8 animate-spin rounded-full border-b-2 border-text-link"></div>
@@ -230,10 +223,11 @@ export default function ActivityLogPage() {
                 Activity Timeline
               </h2>
               <div className="space-y-4">
-                {activities.map((activity) => (
+                {activities.map((activity, index) => (
                   <div
                     key={activity.id}
-                    className="flex items-start gap-4 rounded-lg bg-button-secondary-neutral-bg p-4 transition-colors hover:bg-button-secondary-neutral-bg-hover"
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                    className="animate-fade-in-left flex items-start gap-4 rounded-lg bg-button-secondary-neutral-bg p-4 transition-colors hover:bg-button-secondary-neutral-bg-hover"
                   >
                     <div
                       className={`mt-2 h-3 w-3 rounded-full ${
@@ -270,19 +264,22 @@ export default function ActivityLogPage() {
                             {activity.changeType === "transfer" ? (
                               <span>
                                 Transfer {activity.transferAmount}{" "}
-                                {activity.transferDirection === "to_deep_desert"
-                                  ? "to Deep Desert"
-                                  : "to Hagga"}
+                                {activity.transferDirection ===
+                                  "to_deep_desert" ||
+                                activity.transferDirection ===
+                                  "transfer_to_location_2"
+                                  ? `to ${location2Name}`
+                                  : `to ${location1Name}`}
                               </span>
                             ) : (
                               <div>
                                 <div>
-                                  Hagga:{" "}
+                                  {location1Name}:{" "}
                                   {formatNumber(activity.previousQuantityHagga)}{" "}
                                   → {formatNumber(activity.newQuantityHagga)}
                                 </div>
                                 <div>
-                                  Deep Desert:{" "}
+                                  {location2Name}:{" "}
                                   {formatNumber(
                                     activity.previousQuantityDeepDesert,
                                   )}{" "}
@@ -327,7 +324,7 @@ export default function ActivityLogPage() {
             </div>
           </div>
         )}
-      </div>
-    </div>
+      </PageContainer>
+    </AppShell>
   );
 }

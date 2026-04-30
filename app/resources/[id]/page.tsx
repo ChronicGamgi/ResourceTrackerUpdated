@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { ResourceHistoryChart } from "@/app/components/ResourceHistoryChart";
@@ -11,16 +11,27 @@ import { UpdateQuantityModal } from "@/app/components/UpdateQuantityModal";
 import { ChangeTargetModal } from "@/app/components/ChangeTargetModal";
 import { TransferModal } from "@/app/components/TransferModal";
 import { EditResourceModal } from "@/app/components/EditResourceModal";
-import { TIER_OPTIONS, UPDATE_TYPE } from "@/lib/constants";
+import { DuplicateResourceModal } from "@/app/components/DuplicateResourceModal";
+import { PageContainer } from "@/app/components/PageContainer";
+import { AppShell } from "@/app/components/AppShell";
 import {
+  TIER_OPTIONS,
+  UPDATE_TYPE,
+  type QuantityField,
+  type TransferDirection,
+} from "@/lib/constants";
+import {
+  ArrowLeft,
   Plus,
   Baseline,
   ArrowRightLeft,
   Target,
   Pencil,
+  Copy,
   Trash2,
   AlertTriangle,
 } from "lucide-react";
+import { useLocationNames } from "@/app/context/LocationNamesContext";
 
 const getTierClassName = (tier: number | null | undefined): string => {
   if (tier === null || tier === undefined) return "bg-gray-200 text-gray-800";
@@ -32,8 +43,13 @@ const getTierClassName = (tier: number | null | undefined): string => {
     4: "bg-tier-4-bg text-tier-4-text",
     5: "bg-tier-5-bg text-tier-5-text",
     6: "bg-tier-6-bg text-tier-6-text",
+    7: "bg-tier-7-bg text-tier-7-text",
+    8: "bg-tier-8-bg text-tier-8-text",
+    9: "bg-tier-9-bg text-tier-9-text",
+    10: "bg-tier-10-bg text-tier-10-text",
+    11: "bg-tier-11-bg text-tier-11-text",
   };
-  return tierClasses[tier] || "bg-gray-200 text-gray-800";
+  return tierClasses[tier] ?? "bg-gray-200 text-gray-800";
 };
 
 const CHART_COLORS = {
@@ -41,6 +57,13 @@ const CHART_COLORS = {
   hagga: "#10b981",
   deepDesert: "#f97316",
 };
+
+const CHART_W = 860;
+const CHART_H = 260;
+const CHART_PAD_L = 52;
+const CHART_PAD_R = 20;
+const CHART_PAD_T = 24;
+const CHART_PAD_B = 36;
 
 // Utility function to format numbers with commas
 const formatNumber = (num: number): string => {
@@ -104,6 +127,8 @@ interface Resource {
   name: string;
   quantityHagga: number;
   quantityDeepDesert: number;
+  quantityLocation1: number;
+  quantityLocation2: number;
   description?: string;
   category?: string;
   subcategory?: string;
@@ -121,6 +146,13 @@ export default function ResourceDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { data: session, status: sessionStatus } = useSession();
+  const { location1Name, location2Name } = useLocationNames();
+  const TRANSFER_DIRECTION_LABEL: Record<string, string> = {
+    transfer_to_location_2: `to ${location2Name}`,
+    to_deep_desert: `to ${location2Name}`,
+    transfer_to_location_1: `to ${location1Name}`,
+    to_hagga: `to ${location1Name}`,
+  };
   const [resource, setResource] = useState<Resource | null>(null);
   const [history, setHistory] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
@@ -178,6 +210,11 @@ export default function ResourceDetailPage() {
     resource: Resource | null;
   }>({ isOpen: false, resource: null });
 
+  const [duplicateModalState, setDuplicateModalState] = useState<{
+    isOpen: boolean;
+    resource: Resource | null;
+  }>({ isOpen: false, resource: null });
+
   const [deleteConfirm, setDeleteConfirm] = useState<{
     resourceId: string | null;
     resourceName: string;
@@ -193,10 +230,75 @@ export default function ResourceDetailPage() {
   const isResourceAdmin =
     session?.user?.permissions?.hasResourceAdminAccess ?? false;
 
+  const chartData = useMemo(() => {
+    if (history.length <= 1) return null;
+    const reversedHistory = history.slice().reverse();
+    const maxV = Math.max(
+      ...reversedHistory.map(
+        (p) => p.newQuantityHagga + p.newQuantityDeepDesert,
+      ),
+      resource?.targetQuantity || 0,
+      1,
+    );
+    const xScale = (i: number) =>
+      CHART_PAD_L +
+      (i / Math.max(reversedHistory.length - 1, 1)) *
+        (CHART_W - CHART_PAD_L - CHART_PAD_R);
+    const yScale = (v: number) =>
+      CHART_PAD_T + (1 - v / maxV) * (CHART_H - CHART_PAD_T - CHART_PAD_B);
+    const totalPath = reversedHistory
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"}${xScale(i)},${yScale(p.newQuantityHagga + p.newQuantityDeepDesert)}`,
+      )
+      .join(" ");
+    const haggaPath = reversedHistory
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"}${xScale(i)},${yScale(p.newQuantityHagga)}`,
+      )
+      .join(" ");
+    const deepPath = reversedHistory
+      .map(
+        (p, i) =>
+          `${i === 0 ? "M" : "L"}${xScale(i)},${yScale(p.newQuantityDeepDesert)}`,
+      )
+      .join(" ");
+    const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxV * f));
+    const n = reversedHistory.length;
+    const xIndices =
+      n <= 6
+        ? reversedHistory.map((_, i) => i)
+        : [
+            0,
+            Math.round(n * 0.25),
+            Math.round(n * 0.5),
+            Math.round(n * 0.75),
+            n - 1,
+          ];
+    const today = new Date();
+    return {
+      reversedHistory,
+      maxV,
+      xScale,
+      yScale,
+      totalPath,
+      haggaPath,
+      deepPath,
+      yTicks,
+      xIndices,
+      today,
+    };
+  }, [history, resource?.targetQuantity]);
+
   // Admin function to start editing a resource
   const startEditResource = (resource: Resource) => {
     if (!isResourceAdmin) return;
     setEditModalState({ isOpen: true, resource: resource });
+  };
+
+  const handleDuplicateSuccess = (newResourceId: string) => {
+    router.push(`/resources/${newResourceId}`);
   };
 
   // Fetch history data
@@ -364,7 +466,7 @@ export default function ResourceDetailPage() {
   const handleUpdate = async (
     resourceId: string,
     amount: number,
-    quantityField: "quantityHagga" | "quantityDeepDesert",
+    quantityField: QuantityField,
     updateType: "absolute" | "relative",
     reason?: string,
     onBehalfOf?: string,
@@ -465,7 +567,7 @@ export default function ResourceDetailPage() {
   const handleTransfer = async (
     resourceId: string,
     amount: number,
-    direction: "to_deep_desert" | "to_hagga",
+    direction: TransferDirection,
   ) => {
     try {
       const response = await fetch(`/api/resources/${resourceId}/transfer`, {
@@ -653,11 +755,24 @@ export default function ResourceDetailPage() {
     }
 
     const fetchResource = async () => {
+      const MAX_ATTEMPTS = 5;
+      const RETRY_DELAY_MS = 1000;
+
       try {
         setLoading(true);
-        const response = await fetch(`/api/resources`);
 
-        if (response.ok) {
+        for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+          if (attempt > 0) {
+            await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+          }
+
+          const response = await fetch(`/api/resources?_t=${Date.now()}`);
+
+          if (!response.ok) {
+            setError("Failed to fetch resource");
+            return;
+          }
+
           const resources = await response.json();
           const foundResource = resources.find(
             (r: Resource) => r.id === resourceId,
@@ -666,7 +781,6 @@ export default function ResourceDetailPage() {
           if (foundResource) {
             setResource({
               ...foundResource,
-              // Fix date parsing - only convert if it's not already a string
               updatedAt:
                 typeof foundResource.updatedAt === "string"
                   ? foundResource.updatedAt
@@ -676,13 +790,14 @@ export default function ResourceDetailPage() {
                   ? foundResource.createdAt
                   : new Date(foundResource.createdAt).toISOString(),
             });
-            setNewQuantity(foundResource.quantityHagga); // Initialize edit form
+            setNewQuantity(foundResource.quantityHagga);
             setNewQuantityInput(foundResource.quantityHagga.toString());
-          } else {
+            return;
+          }
+
+          if (attempt === MAX_ATTEMPTS - 1) {
             setError("Resource not found");
           }
-        } else {
-          setError("Failed to fetch resource");
         }
       } catch (error) {
         console.error("Error fetching resource:", error);
@@ -732,55 +847,61 @@ export default function ResourceDetailPage() {
 
   if (loading || sessionStatus === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background-primary">
-        <div className="text-center">
-          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-text-link"></div>
-          <p className="mt-4 text-text-tertiary">Loading resource details...</p>
+      <AppShell>
+        <div className="flex flex-1 items-center justify-center py-8">
+          <div className="text-center">
+            <div className="mx-auto h-12 w-12 animate-spin rounded-full border-b-2 border-text-link"></div>
+            <p className="mt-4 text-text-tertiary">
+              Loading resource details...
+            </p>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
   if (!resource) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background-primary">
-        <div className="text-center">
-          <svg
-            className="mx-auto mb-4 h-16 w-16 text-text-quaternary"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <h2 className="mb-2 text-2xl font-bold text-text-primary">
-            Resource Not Found
-          </h2>
-          <p className="mb-6 text-text-tertiary">
-            The resource you&apos;re looking for doesn&apos;t exist or you
-            don&apos;t have permission to view it.
-            {!canEdit && (
-              <>
-                <br />
-                <span className="text-sm">
-                  Please make sure you have the required Discord roles.
-                </span>
-              </>
-            )}
-          </p>
-          <button
-            onClick={() => router.push("/resources")}
-            className="rounded-lg bg-button-primary-bg px-4 py-2 text-text-white transition-colors hover:bg-button-primary-bg-hover"
-          >
-            Back to Resources
-          </button>
+      <AppShell>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="text-center">
+            <svg
+              className="mx-auto mb-4 h-16 w-16 text-text-quaternary"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            <h2 className="mb-2 text-2xl font-bold text-text-primary">
+              Resource Not Found
+            </h2>
+            <p className="mb-6 text-text-tertiary">
+              The resource you&apos;re looking for doesn&apos;t exist or you
+              don&apos;t have permission to view it.
+              {!canEdit && (
+                <>
+                  <br />
+                  <span className="text-sm">
+                    Please make sure you have the required Discord roles.
+                  </span>
+                </>
+              )}
+            </p>
+            <button
+              onClick={() => router.push("/resources")}
+              className="rounded-lg bg-button-primary-bg px-4 py-2 text-text-white transition-colors hover:bg-button-primary-bg-hover"
+            >
+              Back to Resources
+            </button>
+          </div>
         </div>
-      </div>
+      </AppShell>
     );
   }
 
@@ -797,39 +918,16 @@ export default function ResourceDetailPage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-background-primary transition-colors duration-300">
-      {/* Header */}
-      <div className="border-b border-border-primary bg-background-secondary shadow-xs">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative flex h-16 items-center justify-center">
-            <button
-              onClick={() => router.push("/resources")}
-              className="absolute left-0 flex items-center text-text-tertiary transition-colors hover:text-text-primary"
-            >
-              <svg
-                className="h-5 w-5 md:mr-2"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-              <span className="hidden md:inline">Back to Resources</span>
-            </button>
-            <h1 className="text-center text-xl font-semibold text-text-primary">
-              Resource Details
-            </h1>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+    <AppShell>
+      <PageContainer className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Breadcrumb */}
+        <button
+          onClick={() => router.push("/resources")}
+          className="mb-6 flex items-center gap-1.5 text-sm text-text-tertiary transition-colors hover:text-text-primary"
+        >
+          <ArrowLeft size={13} />
+          Resources
+        </button>
         <div className="space-y-8">
           {/* Resource Info Card - Full Width Horizontal Layout */}
           <div className="w-full">
@@ -932,10 +1030,11 @@ export default function ResourceDetailPage() {
                     <div className="flex flex-col gap-6 text-center sm:flex-row">
                       <div>
                         <div className="text-xl font-bold text-text-primary">
-                          Hagga: {formatNumber(resource.quantityHagga)}
+                          {location1Name}:{" "}
+                          {formatNumber(resource.quantityHagga)}
                         </div>
                         <div className="text-xl font-bold text-text-primary">
-                          Deep Desert:{" "}
+                          {location2Name}:{" "}
                           {formatNumber(resource.quantityDeepDesert)}
                         </div>
                         <div className="text-sm text-text-tertiary">
@@ -1031,7 +1130,7 @@ export default function ResourceDetailPage() {
                               setTransferModalState({ isOpen: true, resource })
                             }
                             className="flex w-full items-center justify-center gap-2 rounded-md bg-button-subtle-green-bg px-3 py-1.5 text-sm font-medium text-button-subtle-green-text transition-colors hover:bg-button-subtle-green-bg-hover"
-                            title="Transfer quantities between Hagga and Deep Desert"
+                            title={`Transfer quantities between ${location1Name} and ${location2Name}`}
                           >
                             <ArrowRightLeft className="hidden h-4 w-4 md:inline-block" />
                             Transfer
@@ -1058,6 +1157,19 @@ export default function ResourceDetailPage() {
                               >
                                 <Pencil className="hidden h-4 w-4 md:inline-block" />
                                 Edit
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setDuplicateModalState({
+                                    isOpen: true,
+                                    resource,
+                                  })
+                                }
+                                className="flex w-full items-center justify-center gap-2 rounded-md bg-button-subtle-blue-bg px-3 py-1.5 text-sm font-medium text-button-subtle-blue-text transition-colors hover:bg-button-subtle-blue-bg-hover"
+                                title="Create a duplicate of this resource"
+                              >
+                                <Copy className="hidden h-4 w-4 md:inline-block" />
+                                Duplicate
                               </button>
                               <button
                                 onClick={() =>
@@ -1217,353 +1329,292 @@ export default function ResourceDetailPage() {
             </div>
 
             {/* History Chart */}
-            {!historyLoading && history.length > 1 && (
+            {!historyLoading && chartData && (
               <div className="mb-6 rounded-lg border border-border-secondary bg-background-modal-content-inset p-4">
-                <h4 className="text-md mb-4 font-medium text-text-secondary">
-                  Quantity Over Time
-                </h4>
-                <div className="relative h-72">
-                  <svg
-                    className="h-full w-full"
-                    onMouseMove={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setMousePosition({
-                        x: e.clientX - rect.left,
-                        y: e.clientY - rect.top,
-                      });
-                    }}
-                    onMouseLeave={() => setHoveredPoint(null)}
-                  >
-                    {/* Chart Lines and Points */}
-                    {(() => {
-                      const reversedHistory = history.slice().reverse();
-
-                      const { minQuantity, maxQuantity } = history.reduce(
-                        (acc, h) => {
-                          const total =
-                            h.newQuantityHagga + h.newQuantityDeepDesert;
-                          acc.minQuantity = Math.min(
-                            acc.minQuantity,
-                            h.newQuantityHagga,
-                            h.newQuantityDeepDesert,
-                            total,
-                          );
-                          acc.maxQuantity = Math.max(
-                            acc.maxQuantity,
-                            h.newQuantityHagga,
-                            h.newQuantityDeepDesert,
-                            total,
-                          );
-                          return acc;
-                        },
-                        { minQuantity: Infinity, maxQuantity: -Infinity },
-                      );
-
-                      const range =
-                        maxQuantity !== -Infinity && minQuantity !== Infinity
-                          ? maxQuantity - minQuantity || 1
-                          : 1;
-
+                <div className="mb-3 flex items-start justify-between">
+                  <div>
+                    <h4 className="text-md font-medium text-text-secondary">
+                      Quantity Over Time
+                    </h4>
+                    <p className="mt-0.5 text-xs text-text-quaternary">
+                      Hover points for details · click to highlight · times
+                      update automatically
+                    </p>
+                  </div>
+                </div>
+                <div className="relative">
+                  {chartData &&
+                    (() => {
+                      const {
+                        reversedHistory,
+                        xScale,
+                        yScale,
+                        totalPath,
+                        haggaPath,
+                        deepPath,
+                        yTicks,
+                        xIndices,
+                        today,
+                      } = chartData;
                       return (
                         <>
-                          {/* Lines */}
-                          {reversedHistory.map((entry, index, arr) => {
-                            if (index === arr.length - 1) return null;
-                            const nextEntry = arr[index + 1];
-
-                            const x1 =
-                              10 + (index / Math.max(arr.length - 1, 1)) * 80;
-                            const x2 =
-                              10 +
-                              ((index + 1) / Math.max(arr.length - 1, 1)) * 80;
-
-                            const y1_total =
-                              80 -
-                              ((entry.newQuantityHagga +
-                                entry.newQuantityDeepDesert -
-                                minQuantity) /
-                                range) *
-                                60;
-                            const y2_total =
-                              80 -
-                              ((nextEntry.newQuantityHagga +
-                                nextEntry.newQuantityDeepDesert -
-                                minQuantity) /
-                                range) *
-                                60;
-                            const y1_hagga =
-                              80 -
-                              ((entry.newQuantityHagga - minQuantity) / range) *
-                                60;
-                            const y2_hagga =
-                              80 -
-                              ((nextEntry.newQuantityHagga - minQuantity) /
-                                range) *
-                                60;
-                            const y1_deep_desert =
-                              80 -
-                              ((entry.newQuantityDeepDesert - minQuantity) /
-                                range) *
-                                60;
-                            const y2_deep_desert =
-                              80 -
-                              ((nextEntry.newQuantityDeepDesert - minQuantity) /
-                                range) *
-                                60;
-
-                            return (
-                              <g key={`line-${entry.id}`}>
+                          <svg
+                            viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+                            width="100%"
+                            style={{ display: "block", overflow: "visible" }}
+                            onMouseMove={(e) => {
+                              const rect =
+                                e.currentTarget.getBoundingClientRect();
+                              setMousePosition({
+                                x: e.clientX - rect.left,
+                                y: e.clientY - rect.top,
+                              });
+                            }}
+                            onMouseLeave={() => setHoveredPoint(null)}
+                          >
+                            {/* Grid lines + Y labels */}
+                            {yTicks.map((v, i) => (
+                              <g key={i}>
                                 <line
-                                  x1={`${x1}%`}
-                                  y1={`${y1_total}%`}
-                                  x2={`${x2}%`}
-                                  y2={`${y2_total}%`}
-                                  stroke={CHART_COLORS.total}
-                                  strokeWidth="2"
+                                  x1={CHART_PAD_L}
+                                  y1={yScale(v)}
+                                  x2={CHART_W - CHART_PAD_R}
+                                  y2={yScale(v)}
+                                  stroke="var(--color-chart-grid-line)"
+                                  strokeDasharray="3 4"
+                                  strokeWidth="1"
                                 />
-                                <line
-                                  x1={`${x1}%`}
-                                  y1={`${y1_hagga}%`}
-                                  x2={`${x2}%`}
-                                  y2={`${y2_hagga}%`}
-                                  stroke={CHART_COLORS.hagga}
-                                  strokeWidth="2"
-                                />
-                                <line
-                                  x1={`${x1}%`}
-                                  y1={`${y1_deep_desert}%`}
-                                  x2={`${x2}%`}
-                                  y2={`${y2_deep_desert}%`}
-                                  stroke={CHART_COLORS.deepDesert}
-                                  strokeWidth="2"
-                                />
+                                <text
+                                  x={CHART_PAD_L - 8}
+                                  y={yScale(v)}
+                                  fill="var(--color-chart-label)"
+                                  fontSize="10"
+                                  textAnchor="end"
+                                  dominantBaseline="middle"
+                                  fontFamily="ui-monospace,monospace"
+                                >
+                                  {formatNumber(v)}
+                                </text>
                               </g>
-                            );
-                          })}
-                          {/* Points */}
-                          {reversedHistory.map((entry, index, arr) => {
-                            const x =
-                              10 + (index / Math.max(arr.length - 1, 1)) * 80;
-                            const y_total =
-                              80 -
-                              ((entry.newQuantityHagga +
-                                entry.newQuantityDeepDesert -
-                                minQuantity) /
-                                range) *
-                                60;
-                            const y_hagga =
-                              80 -
-                              ((entry.newQuantityHagga - minQuantity) / range) *
-                                60;
-                            const y_deep_desert =
-                              80 -
-                              ((entry.newQuantityDeepDesert - minQuantity) /
-                                range) *
-                                60;
+                            ))}
 
-                            const isSelected = selectedPointId === entry.id;
-                            const isHovered = hoveredPoint?.id === entry.id;
-                            const pointRadius = isSelected
-                              ? "6"
-                              : isHovered
-                                ? "5"
-                                : "4";
+                            {/* Target line */}
+                            {resource.targetQuantity != null &&
+                              resource.targetQuantity > 0 && (
+                                <g>
+                                  <line
+                                    x1={CHART_PAD_L}
+                                    y1={yScale(resource.targetQuantity)}
+                                    x2={CHART_W - CHART_PAD_R}
+                                    y2={yScale(resource.targetQuantity)}
+                                    stroke="var(--color-chart-target-line)"
+                                    strokeDasharray="4 4"
+                                    strokeWidth="1.2"
+                                    opacity="0.8"
+                                  />
+                                  <text
+                                    x={CHART_W - CHART_PAD_R}
+                                    y={yScale(resource.targetQuantity) - 6}
+                                    fill="var(--color-chart-target-line)"
+                                    fontSize="10"
+                                    textAnchor="end"
+                                    fontFamily="ui-monospace,monospace"
+                                  >
+                                    TARGET ·{" "}
+                                    {formatNumber(resource.targetQuantity)}
+                                  </text>
+                                </g>
+                              )}
 
-                            return (
-                              <g
-                                key={`point-group-${entry.id}`}
-                                onMouseEnter={() => setHoveredPoint(entry)}
-                                onMouseLeave={() => setHoveredPoint(null)}
-                                onClick={() =>
-                                  setSelectedPointId(
-                                    selectedPointId === entry.id
-                                      ? null
-                                      : entry.id,
-                                  )
-                                }
-                                className="cursor-pointer"
-                              >
-                                <circle
-                                  cx={`${x}%`}
-                                  cy={`${y_total}%`}
-                                  r={pointRadius}
-                                  fill={CHART_COLORS.total}
-                                  stroke={
-                                    isSelected ? CHART_COLORS.total : "white"
+                            {/* X-axis date labels */}
+                            {xIndices.map((i) => {
+                              const entry = reversedHistory[i];
+                              const date = new Date(entry.createdAt);
+                              const label =
+                                date.getFullYear() === today.getFullYear() &&
+                                date.getMonth() === today.getMonth() &&
+                                date.getDate() === today.getDate()
+                                  ? date.toLocaleTimeString([], {
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })
+                                  : date.toLocaleDateString([], {
+                                      month: "short",
+                                      day: "numeric",
+                                    });
+                              return (
+                                <text
+                                  key={i}
+                                  x={xScale(i)}
+                                  y={CHART_H - 8}
+                                  fill="var(--color-chart-label)"
+                                  fontSize="10"
+                                  textAnchor="middle"
+                                >
+                                  {label}
+                                </text>
+                              );
+                            })}
+
+                            {/* Series paths */}
+                            <path
+                              d={totalPath}
+                              fill="none"
+                              stroke={CHART_COLORS.total}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d={haggaPath}
+                              fill="none"
+                              stroke={CHART_COLORS.hagga}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                            <path
+                              d={deepPath}
+                              fill="none"
+                              stroke={CHART_COLORS.deepDesert}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+
+                            {/* Data points */}
+                            {reversedHistory.map((entry, i) => {
+                              const x = xScale(i);
+                              const yTotal = yScale(
+                                entry.newQuantityHagga +
+                                  entry.newQuantityDeepDesert,
+                              );
+                              const yHagga = yScale(entry.newQuantityHagga);
+                              const yDeep = yScale(entry.newQuantityDeepDesert);
+                              const isSelected = selectedPointId === entry.id;
+                              const isHovered = hoveredPoint?.id === entry.id;
+                              const r = isSelected ? 5 : isHovered ? 4 : 3;
+
+                              return (
+                                <g
+                                  key={entry.id}
+                                  onMouseEnter={() => setHoveredPoint(entry)}
+                                  onMouseLeave={() => setHoveredPoint(null)}
+                                  onClick={() =>
+                                    setSelectedPointId(
+                                      selectedPointId === entry.id
+                                        ? null
+                                        : entry.id,
+                                    )
                                   }
-                                  strokeWidth="2"
-                                />
-                                <circle
-                                  cx={`${x}%`}
-                                  cy={`${y_hagga}%`}
-                                  r={pointRadius}
-                                  fill={CHART_COLORS.hagga}
-                                  stroke={
-                                    isSelected ? CHART_COLORS.hagga : "white"
-                                  }
-                                  strokeWidth="2"
-                                />
-                                <circle
-                                  cx={`${x}%`}
-                                  cy={`${y_deep_desert}%`}
-                                  r={pointRadius}
-                                  fill={CHART_COLORS.deepDesert}
-                                  stroke={
-                                    isSelected
-                                      ? CHART_COLORS.deepDesert
-                                      : "white"
-                                  }
-                                  strokeWidth="2"
-                                />
-                              </g>
-                            );
-                          })}
-                          {/* Y-axis labels */}
-                          {Array.from({ length: 4 }).map((_, i) => {
-                            const numLabels = 4;
-                            const value =
-                              minQuantity + (range / (numLabels - 1)) * i;
-                            const y = 80 - ((value - minQuantity) / range) * 60;
-                            return (
-                              <text
-                                key={i}
-                                x="0"
-                                y={`${y}%`}
-                                dominant-baseline="middle"
-                                fontSize="10"
-                                fill="#6b7280"
-                                className="text-xs"
-                                textAnchor="start"
-                              >
-                                {formatNumber(Math.round(value))}
-                              </text>
-                            );
-                          })}
+                                  className="cursor-pointer"
+                                >
+                                  <circle
+                                    cx={x}
+                                    cy={yTotal}
+                                    r={r}
+                                    fill="var(--color-chart-point-fill)"
+                                    stroke={CHART_COLORS.total}
+                                    strokeWidth="1.5"
+                                  />
+                                  <circle
+                                    cx={x}
+                                    cy={yHagga}
+                                    r={r}
+                                    fill="var(--color-chart-point-fill)"
+                                    stroke={CHART_COLORS.hagga}
+                                    strokeWidth="1.5"
+                                  />
+                                  <circle
+                                    cx={x}
+                                    cy={yDeep}
+                                    r={r}
+                                    fill="var(--color-chart-point-fill)"
+                                    stroke={CHART_COLORS.deepDesert}
+                                    strokeWidth="1.5"
+                                  />
+                                </g>
+                              );
+                            })}
+                          </svg>
+
+                          {/* Hover tooltip */}
+                          {hoveredPoint && (
+                            <div
+                              className="pointer-events-none absolute z-10 rounded-sm bg-background-tooltip px-2 py-1 text-xs whitespace-nowrap text-text-tooltip"
+                              style={{
+                                left: mousePosition.x + 10,
+                                top: mousePosition.y - 10,
+                                transform:
+                                  mousePosition.x > 200
+                                    ? "translateX(-100%)"
+                                    : "none",
+                              }}
+                            >
+                              <div className="font-medium">
+                                {formatNumber(
+                                  hoveredPoint.newQuantityHagga +
+                                    hoveredPoint.newQuantityDeepDesert,
+                                )}
+                              </div>
+                              <div className="text-text-tooltip-secondary">
+                                {hoveredPoint.changeAmountHagga +
+                                  hoveredPoint.changeAmountDeepDesert >
+                                0
+                                  ? "+"
+                                  : ""}
+                                {formatNumber(
+                                  hoveredPoint.changeAmountHagga +
+                                    hoveredPoint.changeAmountDeepDesert,
+                                )}
+                              </div>
+                              <div className="text-text-tooltip-secondary">
+                                By: {hoveredPoint.updatedBy}
+                              </div>
+                              <div className="text-text-tooltip-secondary">
+                                {getRelativeTime(
+                                  hoveredPoint.createdAt,
+                                  currentTime,
+                                )}
+                              </div>
+                              <div className="mt-1 text-center text-text-tooltip-accent">
+                                Click to highlight
+                              </div>
+                            </div>
+                          )}
                         </>
                       );
                     })()}
-
-                    {/* X-axis time labels */}
-                    {history.length > 1 &&
-                      history
-                        .slice()
-                        .reverse()
-                        .map((entry, index, arr) => {
-                          if (
-                            index % Math.max(1, Math.floor(arr.length / 4)) !==
-                              0 &&
-                            index !== arr.length - 1
-                          )
-                            return null;
-
-                          const x =
-                            10 + (index / Math.max(arr.length - 1, 1)) * 80;
-                          const date = new Date(entry.createdAt);
-                          const timeLabel =
-                            date.toLocaleDateString() ===
-                            new Date().toLocaleDateString()
-                              ? date.toLocaleTimeString([], {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })
-                              : date.toLocaleDateString([], {
-                                  month: "short",
-                                  day: "numeric",
-                                });
-
-                          const isHovered = hoveredPoint?.id === entry.id;
-                          const isSelected = selectedPointId === entry.id;
-
-                          return (
-                            <text
-                              key={`time-${entry.id}`}
-                              x={`${x}%`}
-                              y="98%"
-                              fontSize="9"
-                              fill="#6b7280"
-                              fontWeight={
-                                isHovered || isSelected ? "bold" : "normal"
-                              }
-                              className="text-xs transition-all"
-                              textAnchor="middle"
-                            >
-                              {timeLabel}
-                            </text>
-                          );
-                        })}
-                  </svg>
-
-                  {/* Hover Tooltip */}
-                  {hoveredPoint && (
-                    <div
-                      className="pointer-events-none absolute z-10 rounded-sm bg-background-tooltip px-2 py-1 text-xs whitespace-nowrap text-text-tooltip"
-                      style={{
-                        left: mousePosition.x + 10,
-                        top: mousePosition.y - 10,
-                        transform:
-                          mousePosition.x > 200 ? "translateX(-100%)" : "none",
-                      }}
-                    >
-                      <div className="font-medium">
-                        {formatNumber(
-                          hoveredPoint.newQuantityHagga +
-                            hoveredPoint.newQuantityDeepDesert,
-                        )}
-                      </div>
-                      <div className="text-text-tooltip-secondary">
-                        {hoveredPoint.changeAmountHagga +
-                          hoveredPoint.changeAmountDeepDesert >
-                        0
-                          ? "+"
-                          : ""}
-                        {formatNumber(
-                          hoveredPoint.changeAmountHagga +
-                            hoveredPoint.changeAmountDeepDesert,
-                        )}
-                      </div>
-                      <div className="text-text-tooltip-secondary">
-                        By: {hoveredPoint.updatedBy}
-                      </div>
-                      <div className="text-text-tooltip-secondary">
-                        {getRelativeTime(hoveredPoint.createdAt, currentTime)}
-                      </div>
-                      <div className="mt-1 text-center text-text-tooltip-accent">
-                        Click to highlight
-                      </div>
-                    </div>
-                  )}
                 </div>
-                <div className="mt-4 flex items-center justify-center gap-6 text-xs text-text-tertiary">
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="h-3 w-3 flex-shrink-0 rounded-full"
+
+                {/* Legend */}
+                <div className="mt-3 flex flex-wrap items-center justify-center gap-4 text-xs text-text-secondary">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
                       style={{ backgroundColor: CHART_COLORS.total }}
-                    ></div>
-                    <span>Total</span>
+                    />
+                    Total
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="h-3 w-3 flex-shrink-0 rounded-full"
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
                       style={{ backgroundColor: CHART_COLORS.hagga }}
-                    ></div>
-                    <span>Hagga</span>
+                    />
+                    {location1Name}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <div
-                      className="h-3 w-3 flex-shrink-0 rounded-full"
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
                       style={{ backgroundColor: CHART_COLORS.deepDesert }}
-                    ></div>
-                    <span>Deep Desert</span>
-                  </div>
-                  <div className="ml-4 text-text-quaternary">
-                    💡 Hover points for details, click to highlight below •
-                    Times update automatically
+                    />
+                    {location2Name}
                   </div>
                 </div>
               </div>
             )}
 
-            {!historyLoading && history.length <= 1 && (
+            {!historyLoading && !chartData && (
               <div className="py-8 text-center text-text-quaternary">
                 <svg
                   className="mx-auto mb-4 h-12 w-12 text-text-quaternary"
@@ -1855,21 +1906,21 @@ export default function ResourceDetailPage() {
                             {entry.changeType === "transfer" ? (
                               <span>
                                 Transfer {entry.transferAmount}{" "}
-                                {entry.transferDirection === "to_deep_desert"
-                                  ? "to Deep Desert"
-                                  : "to Hagga"}
+                                {TRANSFER_DIRECTION_LABEL[
+                                  entry.transferDirection
+                                ] ?? `to ${location1Name}`}
                               </span>
                             ) : (
                               <div className="flex flex-col">
                                 <div>
-                                  Hagga:{" "}
+                                  {location1Name}:{" "}
                                   {formatNumber(entry.previousQuantityHagga)} →{" "}
                                   {formatNumber(entry.newQuantityHagga)} (
                                   {entry.changeAmountHagga > 0 ? "+" : ""}
                                   {formatNumber(entry.changeAmountHagga)})
                                 </div>
                                 <div>
-                                  Deep Desert:{" "}
+                                  {location2Name}:{" "}
                                   {formatNumber(
                                     entry.previousQuantityDeepDesert,
                                   )}{" "}
@@ -1964,7 +2015,7 @@ export default function ResourceDetailPage() {
             )}
           </div>
         </div>
-      </div>
+      </PageContainer>
 
       {/* Congratulations Popup */}
       {congratulationsState.isVisible && (
@@ -2034,6 +2085,17 @@ export default function ResourceDetailPage() {
         />
       )}
 
+      {duplicateModalState.isOpen && duplicateModalState.resource && (
+        <DuplicateResourceModal
+          isOpen={duplicateModalState.isOpen}
+          resource={duplicateModalState.resource}
+          onClose={() =>
+            setDuplicateModalState({ isOpen: false, resource: null })
+          }
+          onSuccess={handleDuplicateSuccess}
+        />
+      )}
+
       {deleteConfirm.showDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background-overlay">
           <div className="mx-4 max-w-md rounded-lg border border-border-primary bg-tile-background p-6">
@@ -2095,6 +2157,6 @@ export default function ResourceDetailPage() {
           </div>
         </div>
       )}
-    </div>
+    </AppShell>
   );
 }

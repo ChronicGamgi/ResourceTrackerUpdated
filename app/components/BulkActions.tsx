@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ImportModal } from "./ImportModal";
 import { ExportConfirmationModal } from "./ExportConfirmationModal";
 import { HardDriveDownload, FileInput } from "lucide-react";
+import { useLocationNames } from "@/app/context/LocationNamesContext";
 
 interface Filters {
   [key: string]: string | number | boolean | Array<string | number | boolean>;
@@ -20,6 +21,7 @@ export function BulkActions({
   filteredCount: number;
 }) {
   const { data: session } = useSession();
+  const { location1Name, location2Name } = useLocationNames();
   const [isImportModalOpen, setisImportModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
@@ -74,6 +76,8 @@ export function BulkActions({
       <ImportModal
         isOpen={isImportModalOpen}
         onClose={() => setisImportModalOpen(false)}
+        location1Name={location1Name}
+        location2Name={location2Name}
       />
       <ExportConfirmationModal
         isOpen={isExportModalOpen}

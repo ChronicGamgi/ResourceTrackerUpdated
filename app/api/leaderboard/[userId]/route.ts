@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { getUserContributions, getUserRank } from "@/lib/leaderboard";
+import { mapCategoryForRead } from "@/lib/resource-mapping";
 
 /**
  * GET /api/leaderboard/[userId]
@@ -27,9 +28,18 @@ export async function GET(
     const { searchParams } = new URL(request.url);
     const timeFilter =
       (searchParams.get("timeFilter") as "24h" | "7d" | "30d" | "all") || "all";
-    const limit = Math.max(1, Math.min(500, parseInt(searchParams.get("limit") || "100", 10) || 100));
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10) || 1);
-    const pageSize = Math.max(1, Math.min(500, parseInt(searchParams.get("pageSize") || "20", 10) || 20));
+    const limit = Math.max(
+      1,
+      Math.min(500, parseInt(searchParams.get("limit") || "100", 10) || 100),
+    );
+    const page = Math.max(
+      1,
+      parseInt(searchParams.get("page") || "1", 10) || 1,
+    );
+    const pageSize = Math.max(
+      1,
+      Math.min(500, parseInt(searchParams.get("pageSize") || "20", 10) || 20),
+    );
 
     // Calculate offset for pagination
     const offset = (page - 1) * pageSize;
@@ -40,12 +50,21 @@ export async function GET(
       getUserRank(userId, timeFilter),
     ]);
 
+    const mappedContributions = contributions.contributions.map((entry: any) =>
+      entry && typeof entry === "object" && "resourceCategory" in entry
+        ? {
+            ...entry,
+            resourceCategory: mapCategoryForRead(entry.resourceCategory),
+          }
+        : entry,
+    );
+
     return NextResponse.json(
       {
         userId: userId,
         timeFilter,
         rank,
-        contributions: contributions.contributions,
+        contributions: mappedContributions,
         summary: contributions.summary,
         total: contributions.total,
         page,
