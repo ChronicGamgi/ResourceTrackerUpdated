@@ -10,6 +10,45 @@ Removed from fork network due to original author repository being deleted, and d
 
 ---
 
+### [4.5.0] - 2026-05-01
+**Redesigned Resource Cards & Sparklines**
+
+#### ✨ Features
+* **Redesigned Grid Cards:** Completely overhauled resource grid cards for both desktop and mobile. The new layout features a status-keyed accent left border, inline status chips with colored indicator dots, large monospace quantity totals, and cleaner color-coded progress bars.
+* **Sparkline Trend Charts:** Introduced dynamic, responsive sparklines to resource grid cards to visualize 30-day historical trends (powered by a new batch fetch endpoint). To preserve UI layout consistency, cards with insufficient data display a blurred, deterministic synthetic curve paired with a "NOT ENOUGH HISTORICAL DATA" overlay.
+
+#### 🚀 Improvements
+* **Consistent Tier Badging:** Image thumbnails in the Table view now feature a tier pill overlaid on the corner to match the new grid card design.
+* **Enhanced Detail View:** The primary image container on the Resource Details page has been updated to be larger (160×160 px), rounded, and includes the new corner tier pill overlay.
+
+---
+
+### [4.4.1] - 2026-04-30
+
+**Security dependency updates**
+
+#### 🚀 Improvements & Tech Debt
+
+- **Security Patches:** Resolved CVE-2026-41305 (PostCSS XSS), GHSA-w5hq-g745-h8pq (uuid buffer bounds), and CVE-2026-33750 (brace-expansion ReDoS) via package overrides.
+- **Native Fetch API:** Removed the `node-fetch` dev dependency in favor of the Node 22 native fetch API.
+
+---
+
+### [4.4.0] - 2026-04-24
+
+**Sidebar Navigation & Improved Resource History Chart**
+
+#### ✨ Features
+
+- **Sidebar Navigation:** Replaced the top navigation bar with a collapsible sidebar on desktop and a slide-out drawer on mobile. The sidebar provides consistent navigation to Dashboard, Resources, Leaderboard, Activity, Settings, and Privacy from every page.
+
+#### 🚀 Improvements
+
+- **Enhanced History Chart:** Improved the Resource Details quantity-over-time chart with a proper coordinate system (`viewBox`), dashed grid lines, Y-axis labels, X-axis date labels, a dashed target line, path-based series rendering, and a legend below the chart.
+- **Informative CSV Exports:** CSV export now includes a read-only 'tier' column showing the human-readable tier/grade label (e.g. "Grade 4", "Tier 3 (Steel)") to help identify resources that share the same name but differ by grade. The column is ignored on import.
+
+---
+
 ### [4.3.0] - 2026-04-19
 
 **Dynamic Inventory Locations, Category Expansion, & Dependency Updates**

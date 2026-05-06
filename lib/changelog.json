@@ -1,6 +1,58 @@
 {
-  "currentVersion": "4.4.0",
+  "currentVersion": "4.5.0",
   "releases": [
+    {
+      "version": "4.5.0",
+      "date": "2026-05-01",
+      "title": "Redesigned resource cards",
+      "type": "minor",
+      "changes": [
+        {
+        "type": "feature",
+        "description": "Resource grid cards have been completely redesigned for both desktop and mobile layouts. They now feature a status-keyed accent left border, an inline status chip with a colored dot, large monospace quantity totals, and a cleaner color-coded progress bar."
+      },
+      {
+        "type": "feature",
+        "description": "Introduced responsive sparkline trend visualizations to all resource grid cards. These charts fetch 30-day historical data via a batch endpoint, with an all-time fallback for sparse data. To maintain strict grid consistency, resources lacking sufficient history display a blurred, deterministic synthetic curve (seeded via resource ID) with a 'NOT ENOUGH HISTORICAL DATA' overlay."
+      },
+      {
+        "type": "improvement",
+        "description": "Table view image thumbnails now feature a tier pill overlaid on the corner, ensuring visual consistency with the new grid cards."
+      },
+      {
+        "type": "improvement",
+        "description": "The image container on the Resource Details page has been enlarged to 160×160 px, rounded, and updated to include the overlaid tier pill."
+      },
+      {
+        "type": "improvement",
+        "description": "All resource categories now earn leaderboard points for ADD and SET actions. The Refined category no longer receives a fixed 2-point bonus — it uses the same quantity/multiplier/status-bonus formula as all other categories."
+      }
+      ]
+    },
+    {
+      "version": "4.4.2",
+      "date": "2026-04-30",
+      "title": "Fix CSV export with Gear Blueprints category filter",
+      "type": "patch",
+      "changes": [
+        {
+          "type": "bugfix",
+          "description": "CSV export now correctly includes resources stored under the legacy 'Blueprints' category when filtering by 'Gear Blueprints', so filtered exports are no longer empty for that category."
+        }
+      ]
+    },
+    {
+      "version": "4.4.1",
+      "date": "2026-04-30",
+      "title": "Security dependency updates",
+      "type": "patch",
+      "changes": [
+        {
+          "type": "improvement",
+          "description": "Resolved CVE-2026-41305 (PostCSS XSS), GHSA-w5hq-g745-h8pq (uuid buffer bounds), and CVE-2026-33750 (brace-expansion ReDoS) via package overrides. Removed node-fetch dev dependency in favour of the Node 22 native fetch API."
+        }
+      ]
+    },
     {
       "version": "4.4.0",
       "date": "2026-04-24",
