@@ -16,6 +16,7 @@ import {
   mapCategoryForRead,
   mapResourceRowForRead,
 } from "@/lib/resource-mapping";
+import { resolveDisplayNames } from "@/lib/users";
 
 /**
  * PUT /api/resources/[id]
@@ -117,12 +118,11 @@ export async function PUT(
 
     let effectiveUserId = actingUserIdentifier;
 
-    // If an admin is acting on behalf of another user, look up that user's display name
+    // If an admin is acting on behalf of another user, look up that user's Discord ID
     if (onBehalfOf && hasResourceAdminAccess(session.user.roles)) {
       const targetUser = await db
         .select({
-          username: users.username,
-          customNickname: users.customNickname,
+          discordId: users.discordId,
         })
         .from(users)
         .where(eq(users.id, onBehalfOf));
@@ -134,11 +134,15 @@ export async function PUT(
         );
       }
 
-      // Use the display name for consistency in history and leaderboards
-      effectiveUserId = targetUser[0].customNickname || targetUser[0].username;
+      // Use the Discord ID for stable tracking — display name resolved at read time
+      effectiveUserId = targetUser[0].discordId;
 
-      // Append an audit note to the reason, staying within the 500-char limit
-      const auditNote = ` (entered by ${actingUserIdentifier})`;
+      // Append a human-readable audit note using the acting admin's display name.
+      // Fallback to "Unknown Admin" so a raw Discord snowflake never surfaces in
+      // stored history if somehow both nickname and username are absent.
+      const actingDisplayName =
+        session.user?.discordNickname || session.user?.name || "Unknown Admin";
+      const auditNote = ` (entered by ${actingDisplayName})`;
       if (reason) {
         const maxBase = 500 - auditNote.length;
         reason =
@@ -271,6 +275,25 @@ export async function PUT(
         pointsCalculation,
       };
     });
+
+    if (result.resource?.lastUpdatedBy) {
+      try {
+        const displayNameMap = await resolveDisplayNames([
+          result.resource.lastUpdatedBy,
+        ]);
+        result.resource = {
+          ...result.resource,
+          lastUpdatedBy:
+            displayNameMap[result.resource.lastUpdatedBy] ||
+            result.resource.lastUpdatedBy,
+        };
+      } catch (error) {
+        console.error(
+          "Failed to resolve display name for lastUpdatedBy:",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
 
     return NextResponse.json(result, {
       headers: {
