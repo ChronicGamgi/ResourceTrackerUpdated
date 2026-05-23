@@ -31,7 +31,7 @@ jobs:
         run: npm run lint
 
       - name: Run TypeScript type check (Next.js aware)
-        run: npx next build --no-lint
+        run: npx next build
         env:
           SKIP_ENV_VALIDATION: true
 
