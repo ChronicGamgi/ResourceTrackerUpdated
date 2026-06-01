@@ -1,6 +1,18 @@
 {
-  "currentVersion": "4.6.0",
+  "currentVersion": "4.6.1",
   "releases": [
+    {
+      "version": "4.6.1",
+      "date": "2026-05-24",
+      "title": "Dead code cleanup",
+      "type": "patch",
+      "changes": [
+        {
+          "type": "improvement",
+          "description": "Removed unused code: deleted the no-op app/template.tsx wrapper and the unused getHierarchyRoles() helper from lib/discord-roles.ts. Demoted several internal-only exports (compareVersions in lib/version.ts and the LEGACY_DIRECTION_*/NEW_DIRECTION_TO_LOCATION_* constants in lib/resource-mapping.ts) to module-private."
+        }
+      ]
+    },
     {
       "version": "4.6.0",
       "date": "2026-05-23",

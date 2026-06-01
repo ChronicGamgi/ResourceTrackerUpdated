@@ -70,7 +70,7 @@ export const getReleasesSince = (lastSeenVersion: string): Release[] => {
  * @param b - Second version string (e.g. `"1.2.0"`)
  * @returns `1` if `a > b`, `-1` if `a < b`, `0` if equal
  */
-export const compareVersions = (a: string, b: string): number => {
+const compareVersions = (a: string, b: string): number => {
   const parseVersion = (version: string) =>
     version.split(".").map((num) => parseInt(num, 10));
 

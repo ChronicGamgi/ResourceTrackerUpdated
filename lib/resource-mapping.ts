@@ -11,10 +11,10 @@
 export const LEGACY_CATEGORY_BLUEPRINTS = "Blueprints";
 export const NEW_CATEGORY_GEAR_BLUEPRINTS = "Gear Blueprints";
 
-export const LEGACY_DIRECTION_TO_HAGGA = "to_hagga";
-export const LEGACY_DIRECTION_TO_DEEP_DESERT = "to_deep_desert";
-export const NEW_DIRECTION_TO_LOCATION_1 = "transfer_to_location_1";
-export const NEW_DIRECTION_TO_LOCATION_2 = "transfer_to_location_2";
+const LEGACY_DIRECTION_TO_HAGGA = "to_hagga";
+const LEGACY_DIRECTION_TO_DEEP_DESERT = "to_deep_desert";
+const NEW_DIRECTION_TO_LOCATION_1 = "transfer_to_location_1";
+const NEW_DIRECTION_TO_LOCATION_2 = "transfer_to_location_2";
 
 /**
  * Maps the legacy category string "Blueprints" to "Gear Blueprints". Leaves

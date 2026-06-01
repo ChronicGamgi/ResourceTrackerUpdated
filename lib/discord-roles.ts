@@ -136,20 +136,6 @@ export function getHighestRole(userRoles: string[]) {
 }
 
 /**
- * Returns all hierarchy roles the user holds, sorted by `level` descending
- * (highest privilege first). Roles not present in the hierarchy config are omitted.
- *
- * @param userRoles - Array of Discord role IDs from the user's JWT token
- * @returns Filtered and sorted array of `RoleConfig` objects
- */
-export function getHierarchyRoles(userRoles: string[]): Array<RoleConfig> {
-  return userRoles
-    .map((roleId) => getRoleInfo(roleId))
-    .filter((role): role is RoleConfig => role !== undefined)
-    .sort((a, b) => b.level - a.level);
-}
-
-/**
  * Checks whether the user has general resource access (read/view).
  *
  * Returns `false` and logs a warning if no roles in the config have
