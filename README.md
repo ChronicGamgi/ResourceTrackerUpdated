@@ -289,3 +289,4 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 This project is open source and available under the [MIT License](./LICENSE).
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/sininspira2/ResourceTracker)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/sininspira2/ResourceTracker?utm_source=oss&utm_medium=github&utm_campaign=sininspira2%2FResourceTracker&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
